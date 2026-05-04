@@ -1,6 +1,7 @@
-import makeWASocket, {
+import {
   DisconnectReason,
   fetchLatestBaileysVersion,
+  makeWASocket,
   useMultiFileAuthState,
   type AnyMessageContent,
   type BaileysEventMap,
