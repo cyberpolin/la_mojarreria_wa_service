@@ -98,16 +98,13 @@ jobs:
           envs: DEPLOY_PATH
           script_stop: true
           script: |
-            set -eux
+            set -eu
 
             : "${DEPLOY_PATH:?CLOUDCLUSTER_DEPLOY_PATH is required}"
 
-            echo "Deploying WA service to $DEPLOY_PATH as $(whoami)"
-            echo "Loading nvm when available"
             export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
             [ ! -s "$NVM_DIR/nvm.sh" ] || . "$NVM_DIR/nvm.sh"
 
-            echo "Extracting release bundle"
             mkdir -p "$DEPLOY_PATH"
             tar -xzf /tmp/mojarreria-wa-service.tar.gz -C "$DEPLOY_PATH" --strip-components=1
             cd "$DEPLOY_PATH"
@@ -118,40 +115,24 @@ jobs:
             if command -v nvm >/dev/null 2>&1; then
               NODE_VERSION="$(find "$SERVICE_DIR" -maxdepth 1 -name .nvmrc -type f -exec cat {} \; -quit)"
               NODE_VERSION="${NODE_VERSION:-"--lts"}"
-
-              echo "Installing Node version: $NODE_VERSION"
               nvm install "$NODE_VERSION"
               nvm use "$NODE_VERSION"
             fi
 
-            echo "Node version after setup:"
             node --version
-            echo "PM2 version before setup:"
-            pm2 --version || true
 
-            echo "Using service directory: $SERVICE_DIR"
-            echo "Preparing pnpm"
             corepack enable
             corepack prepare pnpm@9.15.5 --activate
 
-            echo "Installing PM2"
-            npm install -g pm2
-            NPM_BIN_DIR="$(dirname "$(command -v npm)")"
-            PM2_CMD="$NPM_BIN_DIR/pm2"
-            "$PM2_CMD" --version
-
-            echo "Installing dependencies"
             if [ -f pnpm-lock.yaml ]; then
               pnpm install --prod=false --frozen-lockfile
             else
               pnpm install --prod=false --no-frozen-lockfile
             fi
 
-            echo "Building service"
             pnpm --dir "$SERVICE_DIR" build
 
-            echo "Starting PM2 service"
             mkdir -p "$SERVICE_DIR/auth"
-            "$PM2_CMD" startOrReload "$SERVICE_DIR/ecosystem.config.cjs" --env production
-            "$PM2_CMD" save
-            "$PM2_CMD" status
+            pnpm --dir "$SERVICE_DIR" exec pm2 startOrReload ecosystem.config.cjs --env production
+            pnpm --dir "$SERVICE_DIR" exec pm2 save
+            pnpm --dir "$SERVICE_DIR" exec pm2 status
