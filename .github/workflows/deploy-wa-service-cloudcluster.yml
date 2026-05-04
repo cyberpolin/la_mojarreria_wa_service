@@ -113,11 +113,8 @@ jobs:
             tar -xzf /tmp/mojarreria-wa-service.tar.gz -C "$DEPLOY_PATH" --strip-components=1
             cd "$DEPLOY_PATH"
 
-            if [ -f apps/wa-service/package.json ]; then
-              SERVICE_DIR=apps/wa-service
-            else
-              SERVICE_DIR=.
-            fi
+            SERVICE_DIR=.
+            [ ! -f apps/wa-service/package.json ] || SERVICE_DIR=apps/wa-service
 
             echo "Using service directory: $SERVICE_DIR"
             echo "Preparing pnpm"
