@@ -1,0 +1,27 @@
+{
+  "name": "@mojarreria/wa-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.21",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "pino": "^9.14.0",
+    "qrcode-terminal": "^0.12.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.25",
+    "@types/node": "^22.18.10",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
