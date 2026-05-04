@@ -134,6 +134,11 @@ jobs:
             corepack enable
             corepack prepare pnpm@9.15.5 --activate
 
+            if ! command -v pm2 >/dev/null 2>&1; then
+              echo "Installing PM2"
+              npm install -g pm2
+            fi
+
             echo "Installing dependencies"
             if [ -f pnpm-lock.yaml ]; then
               pnpm install --prod=false --frozen-lockfile
