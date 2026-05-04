@@ -134,10 +134,11 @@ jobs:
             corepack enable
             corepack prepare pnpm@9.15.5 --activate
 
-            if ! command -v pm2 >/dev/null 2>&1; then
-              echo "Installing PM2"
-              npm install -g pm2
-            fi
+            echo "Installing PM2"
+            npm install -g pm2
+            NPM_BIN_DIR="$(dirname "$(command -v npm)")"
+            PM2_CMD="$NPM_BIN_DIR/pm2"
+            "$PM2_CMD" --version
 
             echo "Installing dependencies"
             if [ -f pnpm-lock.yaml ]; then
@@ -151,6 +152,6 @@ jobs:
 
             echo "Starting PM2 service"
             mkdir -p "$SERVICE_DIR/auth"
-            pm2 startOrReload "$SERVICE_DIR/ecosystem.config.cjs" --env production
-            pm2 save
-            pm2 status
+            "$PM2_CMD" startOrReload "$SERVICE_DIR/ecosystem.config.cjs" --env production
+            "$PM2_CMD" save
+            "$PM2_CMD" status
