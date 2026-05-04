@@ -1,0 +1,60 @@
+name: WA Service CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/wa-service/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".github/workflows/wa-service-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/wa-service/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".github/workflows/wa-service-ci.yml"
+
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.4
+
+      - name: Detect service directory
+        run: |
+          if [ -f apps/wa-service/package.json ]; then
+            echo "SERVICE_DIR=apps/wa-service" >> "$GITHUB_ENV"
+          else
+            echo "SERVICE_DIR=." >> "$GITHUB_ENV"
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            pnpm install --no-frozen-lockfile
+          fi
+
+      - name: Typecheck
+        run: pnpm --dir "$SERVICE_DIR" typecheck
+
+      - name: Build
+        run: pnpm --dir "$SERVICE_DIR" build

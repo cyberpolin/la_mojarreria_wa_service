@@ -1,0 +1,126 @@
+name: Deploy WA Service to CloudCluster
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag, or commit SHA to deploy"
+        required: true
+        default: "main"
+
+concurrency:
+  group: wa-service-cloudcluster
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: cloudcluster
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.4
+
+      - name: Detect service directory
+        run: |
+          if [ -f apps/wa-service/package.json ]; then
+            echo "SERVICE_DIR=apps/wa-service" >> "$GITHUB_ENV"
+          else
+            echo "SERVICE_DIR=." >> "$GITHUB_ENV"
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            pnpm install --no-frozen-lockfile
+          fi
+
+      - name: Typecheck
+        run: pnpm --dir "$SERVICE_DIR" typecheck
+
+      - name: Build
+        run: pnpm --dir "$SERVICE_DIR" build
+
+      - name: Write service env file
+        env:
+          WA_SERVICE_ENV_FILE: ${{ secrets.WA_SERVICE_ENV_FILE }}
+        run: |
+          if [ -n "${WA_SERVICE_ENV_FILE:-}" ]; then
+            printf '%s\n' "$WA_SERVICE_ENV_FILE" > "$SERVICE_DIR/.env"
+            chmod 600 "$SERVICE_DIR/.env"
+          fi
+
+      - name: Prepare release bundle
+        run: |
+          mkdir -p /tmp/mojarreria-wa-service
+          rsync -a \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude "apps/wa-service/auth" \
+            --exclude "auth" \
+            ./ /tmp/mojarreria-wa-service/
+          tar -czf mojarreria-wa-service.tar.gz -C /tmp mojarreria-wa-service
+
+      - name: Upload release bundle
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CLOUDCLUSTER_HOST }}
+          username: ${{ secrets.CLOUDCLUSTER_USER }}
+          key: ${{ secrets.CLOUDCLUSTER_SSH_KEY }}
+          port: ${{ secrets.CLOUDCLUSTER_SSH_PORT || 22 }}
+          source: mojarreria-wa-service.tar.gz
+          target: /tmp
+
+      - name: Deploy on CloudCluster
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DEPLOY_PATH: ${{ secrets.CLOUDCLUSTER_DEPLOY_PATH }}
+        with:
+          host: ${{ secrets.CLOUDCLUSTER_HOST }}
+          username: ${{ secrets.CLOUDCLUSTER_USER }}
+          key: ${{ secrets.CLOUDCLUSTER_SSH_KEY }}
+          port: ${{ secrets.CLOUDCLUSTER_SSH_PORT || 22 }}
+          envs: DEPLOY_PATH
+          script_stop: true
+          script: |
+            set -eu
+
+            : "${DEPLOY_PATH:?CLOUDCLUSTER_DEPLOY_PATH is required}"
+
+            mkdir -p "$DEPLOY_PATH"
+            tar -xzf /tmp/mojarreria-wa-service.tar.gz -C "$DEPLOY_PATH" --strip-components=1
+            cd "$DEPLOY_PATH"
+
+            if [ -f apps/wa-service/package.json ]; then
+              SERVICE_DIR=apps/wa-service
+            else
+              SERVICE_DIR=.
+            fi
+
+            corepack enable
+            corepack prepare pnpm@9.15.5 --activate
+            if [ -f pnpm-lock.yaml ]; then
+              pnpm install --prod=false --frozen-lockfile
+            else
+              pnpm install --prod=false --no-frozen-lockfile
+            fi
+            pnpm --dir "$SERVICE_DIR" build
+
+            mkdir -p "$SERVICE_DIR/auth"
+            pm2 startOrReload "$SERVICE_DIR/ecosystem.config.cjs" --env production
+            pm2 save
