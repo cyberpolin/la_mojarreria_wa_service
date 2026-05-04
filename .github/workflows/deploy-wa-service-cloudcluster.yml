@@ -98,10 +98,17 @@ jobs:
           envs: DEPLOY_PATH
           script_stop: true
           script: |
-            set -eu
+            set -eux
 
             : "${DEPLOY_PATH:?CLOUDCLUSTER_DEPLOY_PATH is required}"
 
+            echo "Deploying WA service to $DEPLOY_PATH as $(whoami)"
+            echo "Node version before setup:"
+            node --version || true
+            echo "PM2 version before setup:"
+            pm2 --version || true
+
+            echo "Extracting release bundle"
             mkdir -p "$DEPLOY_PATH"
             tar -xzf /tmp/mojarreria-wa-service.tar.gz -C "$DEPLOY_PATH" --strip-components=1
             cd "$DEPLOY_PATH"
@@ -112,15 +119,23 @@ jobs:
               SERVICE_DIR=.
             fi
 
+            echo "Using service directory: $SERVICE_DIR"
+            echo "Preparing pnpm"
             corepack enable
             corepack prepare pnpm@9.15.5 --activate
+
+            echo "Installing dependencies"
             if [ -f pnpm-lock.yaml ]; then
               pnpm install --prod=false --frozen-lockfile
             else
               pnpm install --prod=false --no-frozen-lockfile
             fi
+
+            echo "Building service"
             pnpm --dir "$SERVICE_DIR" build
 
+            echo "Starting PM2 service"
             mkdir -p "$SERVICE_DIR/auth"
             pm2 startOrReload "$SERVICE_DIR/ecosystem.config.cjs" --env production
             pm2 save
+            pm2 status
