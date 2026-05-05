@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import { rememberCampaign } from "../services/campaignStore.js";
 import { normalizePhone } from "../utils/phone.js";
+import { validateServiceRequest } from "../utils/requestAuth.js";
 import type { WhatsAppClient } from "../baileys/client.js";
 
 const subscriptionMessageSchema = z.object({
@@ -11,11 +12,6 @@ const subscriptionMessageSchema = z.object({
   phone: z.string().trim().min(10).max(20),
   campaignKey: z.string().trim().min(1).max(120)
 });
-
-function isValidApiKey(req: Request, config: AppConfig): boolean {
-  const apiKey = req.header("x-api-key");
-  return apiKey === config.serviceApiKey;
-}
 
 export function createMessagesRouter(params: {
   config: AppConfig;
@@ -25,8 +21,9 @@ export function createMessagesRouter(params: {
   const router = Router();
 
   router.post("/subscription", async (req: Request, res: Response) => {
-    if (!isValidApiKey(req, params.config)) {
-      res.status(401).json({ ok: false, error: "Unauthorized" });
+    const authResult = validateServiceRequest(req, params.config);
+    if (!authResult.ok) {
+      res.status(authResult.status).json({ ok: false, error: authResult.error });
       return;
     }
 

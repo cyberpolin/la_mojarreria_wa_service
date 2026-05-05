@@ -28,6 +28,7 @@ Edit `apps/wa-service/.env`:
 ```dotenv
 PORT=3001
 SERVICE_API_KEY=replace-with-a-long-random-api-key
+SERVICE_ALLOWED_DOMAINS=lamojarreria.com,localhost,127.0.0.1
 MAIN_BACKEND_URL=https://api.lamojarreria.example
 MAIN_BACKEND_WEBHOOK_SECRET=replace-with-a-long-random-webhook-secret
 WHATSAPP_AUTH_DIR=./auth
@@ -66,7 +67,10 @@ Headers:
 
 ```http
 x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
 ```
+
+The trusted domain can also come from `Origin` or `Referer`, but server-to-server callers should send `x-client-domain` explicitly. Use `x-client-domain: localhost` for local client testing.
 
 Body:
 
