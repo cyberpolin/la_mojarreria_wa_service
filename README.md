@@ -95,6 +95,49 @@ Response:
 
 The service validates the request with zod, normalizes the phone number to digits only, sends the WhatsApp message, and stores `phone -> campaignKey` in memory.
 
+### `GET /whatsapp/status`
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+Returns:
+
+```json
+{
+  "ok": true,
+  "connected": false,
+  "connection": "connecting",
+  "hasQr": true
+}
+```
+
+### `GET /whatsapp/qr`
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+Returns the latest Baileys pairing QR string when WhatsApp needs to be linked:
+
+```json
+{
+  "ok": true,
+  "qr": "...",
+  "connected": false,
+  "connection": "connecting",
+  "hasQr": true
+}
+```
+
+The QR grants access to link the WhatsApp session, so this endpoint is protected by the same API key and domain checks as message sending.
+
 ## Reply Webhook
 
 When the user replies, this service calls:

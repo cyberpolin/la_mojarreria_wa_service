@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import type { AppConfig } from "./config.js";
 import type { WhatsAppClient } from "./baileys/client.js";
 import { createMessagesRouter } from "./routes/messages.js";
+import { createWhatsAppRouter } from "./routes/whatsapp.js";
 
 export function createServer(params: {
   config: AppConfig;
@@ -23,6 +24,14 @@ export function createServer(params: {
     createMessagesRouter({
       config: params.config,
       logger: params.logger,
+      whatsAppClient: params.whatsAppClient
+    })
+  );
+
+  app.use(
+    "/whatsapp",
+    createWhatsAppRouter({
+      config: params.config,
       whatsAppClient: params.whatsAppClient
     })
   );

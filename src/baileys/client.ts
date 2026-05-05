@@ -84,6 +84,8 @@ export class WhatsAppClient {
   private socket: WASocket | null = null;
   private isStopping = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private latestQr: string | null = null;
+  private connectionStatus: "connecting" | "open" | "close" = "connecting";
 
   constructor(
     private readonly config: AppConfig,
@@ -108,15 +110,19 @@ export class WhatsAppClient {
     socket.ev.on("creds.update", saveCreds);
     socket.ev.on("connection.update", (update) => {
       if (update.qr) {
+        this.latestQr = update.qr;
         this.logger.info("Scan this QR code with WhatsApp to connect the service");
         qrcode.generate(update.qr, { small: true });
       }
 
       if (update.connection === "open") {
+        this.latestQr = null;
+        this.connectionStatus = "open";
         this.logger.info("WhatsApp socket connected");
       }
 
       if (update.connection === "close") {
+        this.connectionStatus = "close";
         const statusCode = getDisconnectStatusCode(update.lastDisconnect?.error);
         const loggedOut = statusCode === DisconnectReason.loggedOut;
 
@@ -167,6 +173,22 @@ export class WhatsAppClient {
     }
 
     return messageId;
+  }
+
+  getStatus(): {
+    connected: boolean;
+    connection: "connecting" | "open" | "close";
+    hasQr: boolean;
+  } {
+    return {
+      connected: this.connectionStatus === "open",
+      connection: this.connectionStatus,
+      hasQr: this.latestQr !== null
+    };
+  }
+
+  getLatestQr(): string | null {
+    return this.latestQr;
   }
 
   private scheduleReconnect(): void {
