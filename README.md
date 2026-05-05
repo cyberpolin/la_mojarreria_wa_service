@@ -149,6 +149,14 @@ x-client-domain: lamojarreria.com
 
 Returns the latest Baileys pairing QR rendered as an SVG image. Open this URL in a browser with the required headers through a client tool, or proxy it from an internal admin screen.
 
+For one-off admin pairing in a browser, GET-only WhatsApp endpoints also accept query params:
+
+```text
+https://api.wa.lamojarreria.com/whatsapp/qr.svg?apiKey=SERVICE_API_KEY&clientDomain=lamojarreria.com
+```
+
+Prefer headers from application code. Query params can be captured by browser history and server logs.
+
 ## Reply Webhook
 
 When the user replies, this service calls:
