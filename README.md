@@ -124,35 +124,25 @@ x-api-key: SERVICE_API_KEY
 x-client-domain: lamojarreria.com
 ```
 
-Returns the latest Baileys pairing QR string when WhatsApp needs to be linked:
+Returns the latest Baileys pairing QR string and a base64 PNG data URL when WhatsApp needs to be linked:
 
 ```json
 {
   "ok": true,
   "qr": "...",
+  "qrImage": "data:image/png;base64,...",
   "connected": false,
   "connection": "connecting",
   "hasQr": true
 }
 ```
 
-The QR grants access to link the WhatsApp session, so this endpoint is protected by the same API key and domain checks as message sending.
-
-### `GET /whatsapp/qr.svg`
-
-Headers:
-
-```http
-x-api-key: SERVICE_API_KEY
-x-client-domain: lamojarreria.com
-```
-
-Returns the latest Baileys pairing QR rendered as an SVG image. Open this URL in a browser with the required headers through a client tool, or proxy it from an internal admin screen.
+Render `qrImage` directly in an `<img>` tag. The QR grants access to link the WhatsApp session, so this endpoint is protected by the same API key and domain checks as message sending.
 
 For one-off admin pairing in a browser, GET-only WhatsApp endpoints also accept query params:
 
 ```text
-https://api.wa.lamojarreria.com/whatsapp/qr.svg?apiKey=SERVICE_API_KEY&clientDomain=lamojarreria.com
+https://api.wa.lamojarreria.com/whatsapp/qr?apiKey=SERVICE_API_KEY&clientDomain=lamojarreria.com
 ```
 
 Prefer headers from application code. Query params can be captured by browser history and server logs.
