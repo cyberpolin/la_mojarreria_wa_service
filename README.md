@@ -138,6 +138,17 @@ Returns the latest Baileys pairing QR string when WhatsApp needs to be linked:
 
 The QR grants access to link the WhatsApp session, so this endpoint is protected by the same API key and domain checks as message sending.
 
+### `GET /whatsapp/qr.svg`
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+Returns the latest Baileys pairing QR rendered as an SVG image. Open this URL in a browser with the required headers through a client tool, or proxy it from an internal admin screen.
+
 ## Reply Webhook
 
 When the user replies, this service calls:
