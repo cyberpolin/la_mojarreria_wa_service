@@ -32,6 +32,8 @@ SERVICE_ALLOWED_DOMAINS=lamojarreria.com,localhost,127.0.0.1
 MAIN_BACKEND_URL=https://api.lamojarreria.example
 MAIN_BACKEND_WEBHOOK_SECRET=replace-with-a-long-random-webhook-secret
 WHATSAPP_AUTH_DIR=./auth
+REGISTRY_STORE_FILE=./data/registrations.json
+DUMMY_REGISTRY_API_URL=
 ```
 
 Start the service:
@@ -55,6 +57,10 @@ pnpm --filter @mojarreria/wa-service typecheck
 
 ### `GET /health`
 
+```bash
+curl https://api.wa.lamojarreria.com/health
+```
+
 Returns:
 
 ```json
@@ -71,6 +77,18 @@ x-client-domain: lamojarreria.com
 ```
 
 The trusted domain can also come from `Origin` or `Referer`, but server-to-server callers should send `x-client-domain` explicitly. Use `x-client-domain: localhost` for local client testing.
+
+```bash
+curl -X POST https://api.wa.lamojarreria.com/messages/subscription \
+  -H "content-type: application/json" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com" \
+  -d '{
+    "name": "Carlos",
+    "phone": "529931234567",
+    "campaignKey": "free_papas_signup"
+  }'
+```
 
 Body:
 
@@ -93,7 +111,80 @@ Response:
 }
 ```
 
-The service validates the request with zod, normalizes the phone number to digits only, sends the WhatsApp message, and stores `phone -> campaignKey` in memory.
+The service validates the request with zod, normalizes the phone number to digits only, sends the WhatsApp message, and stores a `pending` registry in `REGISTRY_STORE_FILE`.
+
+If the phone already exists in the JSON registry, the service sends this WhatsApp message instead of creating a new pending registry:
+
+```text
+Este número ya está registrado. Si aún no has pedido tus papas gratis, solo haz un pedido. Si ya las usaste, estate pendiente, pronto te enviaremos promociones.
+```
+
+Duplicate response:
+
+```json
+{
+  "ok": true,
+  "phone": "529931234567",
+  "campaignKey": "free_papas_signup",
+  "messageId": "...",
+  "alreadyRegistered": true
+}
+```
+
+If `DUMMY_REGISTRY_API_URL` is set, the service also sends a best-effort `PUT` to:
+
+```text
+DUMMY_REGISTRY_API_URL + "/registrations/:phone"
+```
+
+The payload includes `id`, `phone`, `name`, `campaignKey`, `status`, message ids, reply text, and timestamps.
+
+### `POST /messages/broadcast`
+
+Sends one WhatsApp message to every registered user in the local JSON registry.
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+Body:
+
+```json
+{
+  "text": "Hoy tenemos promocion de papas gratis en tu pedido.",
+  "status": "active"
+}
+```
+
+`status` defaults to `active`. Use `pending`, `active`, or `all`.
+
+```bash
+curl -X POST https://api.wa.lamojarreria.com/messages/broadcast \
+  -H "content-type: application/json" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com" \
+  -d '{
+    "text": "Hoy tenemos promocion de papas gratis en tu pedido.",
+    "status": "active"
+  }'
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "total": 2,
+  "sent": 2,
+  "failed": 0,
+  "results": [
+    { "ok": true, "phone": "529931234567", "messageId": "..." }
+  ]
+}
+```
 
 ### `GET /whatsapp/status`
 
@@ -102,6 +193,12 @@ Headers:
 ```http
 x-api-key: SERVICE_API_KEY
 x-client-domain: lamojarreria.com
+```
+
+```bash
+curl https://api.wa.lamojarreria.com/whatsapp/status \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
 ```
 
 Returns:
@@ -122,6 +219,12 @@ Headers:
 ```http
 x-api-key: SERVICE_API_KEY
 x-client-domain: lamojarreria.com
+```
+
+```bash
+curl https://api.wa.lamojarreria.com/whatsapp/qr \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
 ```
 
 Returns the latest Baileys pairing QR string and a base64 PNG data URL when WhatsApp needs to be linked:
@@ -176,6 +279,8 @@ Payload:
 ```
 
 If the phone is not present in the in-memory campaign map, `campaignKey` is sent as `null`.
+
+Any user reply marks the JSON registry as `active`. If `DUMMY_REGISTRY_API_URL` is set, the same registry is also updated there with `status: "active"`.
 
 ## VPS Deployment With pm2
 

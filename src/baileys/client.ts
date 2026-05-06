@@ -13,6 +13,8 @@ import qrcode from "qrcode-terminal";
 import type { AppConfig } from "../config.js";
 import { getCampaignForPhone } from "../services/campaignStore.js";
 import { notifySubscriptionReply } from "../services/backendWebhook.js";
+import { activateDummyRegistry } from "../services/dummyRegistryApi.js";
+import { activateRegistry, getRegistryRecord } from "../services/registryStore.js";
 import { phoneFromWhatsAppJid, phoneToWhatsAppJid } from "../utils/phone.js";
 
 type MessagesUpsert = BaileysEventMap["messages.upsert"];
@@ -157,12 +159,28 @@ export class WhatsAppClient {
     name: string;
     phone: string;
   }): Promise<string> {
+    return this.sendTextMessage({
+      phone: params.phone,
+      text: `Hola ${params.name}, gracias por registrarte en La Mojarrería. Responde SI para confirmar tu registro y recibir tus papas gratis.`
+    });
+  }
+
+  async sendAlreadyRegisteredMessage(params: {
+    phone: string;
+  }): Promise<string> {
+    return this.sendTextMessage({
+      phone: params.phone,
+      text: "Este número ya está registrado. Si aún no has pedido tus papas gratis, solo haz un pedido. Si ya las usaste, estate pendiente, pronto te enviaremos promociones."
+    });
+  }
+
+  async sendTextMessage(params: { phone: string; text: string }): Promise<string> {
     if (!this.socket) {
       throw new Error("WhatsApp socket is not initialized");
     }
 
     const content: AnyMessageContent = {
-      text: `Hola ${params.name}, gracias por registrarte en La Mojarrería. Responde SI para confirmar tu registro y recibir tus papas gratis.`
+      text: params.text
     };
 
     const response = await this.socket.sendMessage(phoneToWhatsAppJid(params.phone), content);
@@ -231,14 +249,29 @@ export class WhatsAppClient {
       return;
     }
 
+    const existingRecord = await getRegistryRecord(this.config.registryStoreFile, phone);
+    const campaignKey = getCampaignForPhone(phone) ?? existingRecord?.campaignKey ?? null;
     const payload = {
       phone,
       text,
       messageId,
       timestamp: getMessageTimestamp(message),
       source: "baileys" as const,
-      campaignKey: getCampaignForPhone(phone)
+      campaignKey
     };
+
+    const registryRecord = await activateRegistry({
+      filePath: this.config.registryStoreFile,
+      phone,
+      text,
+      replyMessageId: messageId,
+      campaignKey: payload.campaignKey
+    });
+    await activateDummyRegistry({
+      baseUrl: this.config.dummyRegistryApiUrl,
+      logger: this.logger,
+      record: registryRecord
+    });
 
     try {
       await notifySubscriptionReply(this.config, this.logger, payload);
