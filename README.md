@@ -151,7 +151,7 @@ If `DUMMY_REGISTRY_API_URL` is set, the service also sends a best-effort `PUT` t
 DUMMY_REGISTRY_API_URL + "/registrations/:phone"
 ```
 
-The payload includes `id`, `phone`, `name`, `campaignKey`, `status`, message ids, reply text, and timestamps.
+The payload includes `id`, `phone`, `name`, `campaignKey`, `status`, and timestamps.
 
 ### `GET /messages/registrations`
 
@@ -331,9 +331,9 @@ Payload:
 }
 ```
 
-If the phone is not present in the in-memory campaign map, `campaignKey` is sent as `null`.
+If the phone is not present in the local JSON registry, `campaignKey` is sent as `null`.
 
-Any user reply marks the JSON registry as `active`. If `DUMMY_REGISTRY_API_URL` is set, the same registry is also updated there with `status: "active"`.
+Any user reply from a phone that already exists in the JSON registry marks that registry as `active`. Replies from unknown phones still notify the backend webhook, but they do not create local registry records. If `DUMMY_REGISTRY_API_URL` is set, existing registries are also updated there with `status: "active"`.
 
 ## VPS Deployment With pm2
 

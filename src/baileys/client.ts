@@ -263,15 +263,15 @@ export class WhatsAppClient {
     const registryRecord = await activateRegistry({
       filePath: this.config.registryStoreFile,
       phone,
-      text,
-      replyMessageId: messageId,
       campaignKey: payload.campaignKey
     });
-    await activateDummyRegistry({
-      baseUrl: this.config.dummyRegistryApiUrl,
-      logger: this.logger,
-      record: registryRecord
-    });
+    if (registryRecord) {
+      await activateDummyRegistry({
+        baseUrl: this.config.dummyRegistryApiUrl,
+        logger: this.logger,
+        record: registryRecord
+      });
+    }
 
     try {
       await notifySubscriptionReply(this.config, this.logger, payload);

@@ -136,7 +136,6 @@ export function createMessagesRouter(params: {
         phone,
         name: parsed.data.name,
         campaignKey: parsed.data.campaignKey,
-        sentMessageId: messageId,
         status: parsed.data.status
       });
       await savePendingToDummyRegistry({

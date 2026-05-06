@@ -8,9 +8,6 @@ export type RegistryRecord = {
   name: string | null;
   campaignKey: string | null;
   status: RegistryStatus;
-  sentMessageId: string | null;
-  replyMessageId: string | null;
-  replyText: string | null;
   createdAt: string;
   updatedAt: string;
   activatedAt: string | null;
@@ -65,7 +62,6 @@ export async function upsertPendingRegistry(params: {
   phone: string;
   name: string;
   campaignKey: string;
-  sentMessageId: string;
   status?: RegistryStatus;
 }): Promise<RegistryRecord> {
   return enqueueWrite(async () => {
@@ -79,9 +75,6 @@ export async function upsertPendingRegistry(params: {
       name: params.name,
       campaignKey: params.campaignKey,
       status,
-      sentMessageId: params.sentMessageId,
-      replyMessageId: existing?.replyMessageId ?? null,
-      replyText: existing?.replyText ?? null,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       activatedAt: status === "active" ? (existing?.activatedAt ?? now) : (existing?.activatedAt ?? null)
@@ -111,34 +104,28 @@ export async function listRegistryRecords(filePath: string): Promise<RegistryRec
 export async function activateRegistry(params: {
   filePath: string;
   phone: string;
-  text: string;
-  replyMessageId: string;
   campaignKey: string | null;
-}): Promise<RegistryRecord> {
+}): Promise<RegistryRecord | null> {
   return enqueueWrite(async () => {
     const now = new Date().toISOString();
     const data = await readData(params.filePath);
     const existing = data.registrations.find((record) => record.phone === params.phone);
 
+    if (!existing) {
+      return null;
+    }
+
     const nextRecord: RegistryRecord = {
       phone: params.phone,
-      name: existing?.name ?? null,
-      campaignKey: existing?.campaignKey ?? params.campaignKey,
+      name: existing.name,
+      campaignKey: existing.campaignKey ?? params.campaignKey,
       status: "active",
-      sentMessageId: existing?.sentMessageId ?? null,
-      replyMessageId: params.replyMessageId,
-      replyText: params.text,
-      createdAt: existing?.createdAt ?? now,
+      createdAt: existing.createdAt,
       updatedAt: now,
       activatedAt: now
     };
 
-    if (existing) {
-      Object.assign(existing, nextRecord);
-    } else {
-      data.registrations.push(nextRecord);
-    }
-
+    Object.assign(existing, nextRecord);
     await writeData(params.filePath, data);
     return nextRecord;
   });
