@@ -89,6 +89,7 @@ export class WhatsAppClient {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private latestQr: string | null = null;
   private connectionStatus: "connecting" | "open" | "close" = "connecting";
+  private phoneByLid = new Map<string, string>();
 
   constructor(
     private readonly config: AppConfig,
@@ -139,6 +140,12 @@ export class WhatsAppClient {
 
     socket.ev.on("messages.upsert", (event) => {
       void this.handleMessagesUpsert(event);
+    });
+    socket.ev.on("chats.phoneNumberShare", ({ lid, jid }) => {
+      const phone = phoneFromWhatsAppJid(jid);
+      if (phone) {
+        this.phoneByLid.set(lid, phone);
+      }
     });
   }
 
@@ -242,7 +249,7 @@ export class WhatsAppClient {
       return;
     }
 
-    const phone = phoneFromWhatsAppJid(remoteJid);
+    const phone = this.getPhoneFromRemoteJid(remoteJid);
     const text = getMessageText(message.message);
     const messageId = message.key.id;
 
@@ -289,5 +296,9 @@ export class WhatsAppClient {
     } catch (error) {
       this.logger.error({ err: error, phone, messageId }, "failed to forward WhatsApp reply");
     }
+  }
+
+  private getPhoneFromRemoteJid(remoteJid: string): string | null {
+    return phoneFromWhatsAppJid(remoteJid) ?? this.phoneByLid.get(remoteJid) ?? null;
   }
 }

@@ -26,6 +26,10 @@ export function phoneToWhatsAppJid(phone: string): string {
 }
 
 export function phoneFromWhatsAppJid(jid: string): string | null {
+  if (!jid.endsWith("@s.whatsapp.net")) {
+    return null;
+  }
+
   const [user] = jid.split("@");
   if (!user) {
     return null;
