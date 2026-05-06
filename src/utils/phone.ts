@@ -10,6 +10,14 @@ export function normalizePhone(rawPhone: string): string {
     throw new Error("Phone number must contain 10 to 15 digits");
   }
 
+  if (digits.length === 10) {
+    return `521${digits}`;
+  }
+
+  if (digits.startsWith("52") && !digits.startsWith("521") && digits.length === 12) {
+    return `521${digits.slice(2)}`;
+  }
+
   return digits;
 }
 

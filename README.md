@@ -125,7 +125,7 @@ Response:
 }
 ```
 
-The service validates the request with zod, normalizes the phone number to digits only, sends the WhatsApp message, and stores the registry in `REGISTRY_STORE_FILE`.
+The service validates the request with zod, normalizes the phone number, sends the WhatsApp message, and stores the registry in `REGISTRY_STORE_FILE`. Mexican 10-digit numbers are normalized to `521...`; for example, `529931175435` becomes `5219931175435`.
 
 If the phone already exists in the JSON registry, the service sends this WhatsApp message instead of creating a new pending registry:
 
