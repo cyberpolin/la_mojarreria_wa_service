@@ -139,6 +139,45 @@ DUMMY_REGISTRY_API_URL + "/registrations/:phone"
 
 The payload includes `id`, `phone`, `name`, `campaignKey`, `status`, message ids, reply text, and timestamps.
 
+### `GET /messages/registrations`
+
+Lists registered phones from the local JSON registry.
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+```bash
+curl "https://api.wa.lamojarreria.com/messages/registrations?status=all" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+`status` defaults to `all`. Use `pending`, `active`, or `all`.
+
+Response:
+
+```json
+{
+  "ok": true,
+  "total": 1,
+  "registrations": [
+    {
+      "phone": "529931234567",
+      "name": "Carlos",
+      "campaignKey": "free_papas_signup",
+      "status": "active",
+      "createdAt": "2026-05-06T00:00:00.000Z",
+      "updatedAt": "2026-05-06T00:05:00.000Z",
+      "activatedAt": "2026-05-06T00:05:00.000Z"
+    }
+  ]
+}
+```
+
 ### `POST /messages/broadcast`
 
 Sends one WhatsApp message to every registered user in the local JSON registry.

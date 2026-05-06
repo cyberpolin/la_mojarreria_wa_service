@@ -20,12 +20,58 @@ const broadcastMessageSchema = z.object({
   status: z.enum(["pending", "active", "all"]).default("active")
 });
 
+const listRegistrationsQuerySchema = z.object({
+  status: z.enum(["pending", "active", "all"]).default("all")
+});
+
 export function createMessagesRouter(params: {
   config: AppConfig;
   logger: Logger;
   whatsAppClient: WhatsAppClient;
 }): Router {
   const router = Router();
+
+  router.get("/registrations", async (req: Request, res: Response) => {
+    const authResult = validateServiceRequest(req, params.config);
+    if (!authResult.ok) {
+      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      return;
+    }
+
+    const parsed = listRegistrationsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        ok: false,
+        error: "Invalid query",
+        issues: parsed.error.flatten().fieldErrors
+      });
+      return;
+    }
+
+    try {
+      const records = await listRegistryRecords(params.config.registryStoreFile);
+      const filteredRecords = records.filter(
+        (record) => parsed.data.status === "all" || record.status === parsed.data.status
+      );
+
+      res.json({
+        ok: true,
+        total: filteredRecords.length,
+        registrations: filteredRecords.map((record) => ({
+          phone: record.phone,
+          name: record.name,
+          campaignKey: record.campaignKey,
+          status: record.status,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt,
+          activatedAt: record.activatedAt
+        }))
+      });
+    } catch (error) {
+      params.logger.error({ err: error }, "failed to list registered phones");
+      res.status(502).json({ ok: false, error: "Failed to list registrations" });
+    }
+  });
 
   router.post("/subscription", async (req: Request, res: Response) => {
     const authResult = validateServiceRequest(req, params.config);
