@@ -9,10 +9,22 @@ import { normalizePhone } from "../utils/phone.js";
 import { validateServiceRequest } from "../utils/requestAuth.js";
 import type { WhatsAppClient } from "../baileys/client.js";
 
+const initialRegistryStatusSchema = z
+  .enum(["pending", "active", "activated", "activo", "activado", "pendiente"])
+  .default("pending")
+  .transform((status) => {
+    if (status === "active" || status === "activated" || status === "activo" || status === "activado") {
+      return "active" as const;
+    }
+
+    return "pending" as const;
+  });
+
 const subscriptionMessageSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(10).max(20),
-  campaignKey: z.string().trim().min(1).max(120)
+  campaignKey: z.string().trim().min(1).max(120),
+  status: initialRegistryStatusSchema
 });
 
 const broadcastMessageSchema = z.object({
@@ -124,7 +136,8 @@ export function createMessagesRouter(params: {
         phone,
         name: parsed.data.name,
         campaignKey: parsed.data.campaignKey,
-        sentMessageId: messageId
+        sentMessageId: messageId,
+        status: parsed.data.status
       });
       await savePendingToDummyRegistry({
         baseUrl: params.config.dummyRegistryApiUrl,
@@ -136,7 +149,8 @@ export function createMessagesRouter(params: {
         ok: true,
         phone,
         campaignKey: parsed.data.campaignKey,
-        messageId
+        messageId,
+        status: registryRecord.status
       });
     } catch (error) {
       params.logger.error({ err: error, phone }, "failed to send subscription WhatsApp message");

@@ -66,23 +66,25 @@ export async function upsertPendingRegistry(params: {
   name: string;
   campaignKey: string;
   sentMessageId: string;
+  status?: RegistryStatus;
 }): Promise<RegistryRecord> {
   return enqueueWrite(async () => {
     const now = new Date().toISOString();
     const data = await readData(params.filePath);
     const existing = data.registrations.find((record) => record.phone === params.phone);
+    const status = params.status ?? existing?.status ?? "pending";
 
     const nextRecord: RegistryRecord = {
       phone: params.phone,
       name: params.name,
       campaignKey: params.campaignKey,
-      status: existing?.status ?? "pending",
+      status,
       sentMessageId: params.sentMessageId,
       replyMessageId: existing?.replyMessageId ?? null,
       replyText: existing?.replyText ?? null,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
-      activatedAt: existing?.activatedAt ?? null
+      activatedAt: status === "active" ? (existing?.activatedAt ?? now) : (existing?.activatedAt ?? null)
     };
 
     if (existing) {

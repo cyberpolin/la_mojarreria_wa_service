@@ -86,7 +86,8 @@ curl -X POST https://api.wa.lamojarreria.com/messages/subscription \
   -d '{
     "name": "Carlos",
     "phone": "529931234567",
-    "campaignKey": "free_papas_signup"
+    "campaignKey": "free_papas_signup",
+    "status": "pending"
   }'
 ```
 
@@ -96,9 +97,12 @@ Body:
 {
   "name": "Carlos",
   "phone": "529931234567",
-  "campaignKey": "free_papas_signup"
+  "campaignKey": "free_papas_signup",
+  "status": "pending"
 }
 ```
+
+`status` is optional and defaults to `pending`. To create the registry as active immediately, send `active`, `activated`, `activo`, or `activado`.
 
 Response:
 
@@ -107,11 +111,12 @@ Response:
   "ok": true,
   "phone": "529931234567",
   "campaignKey": "free_papas_signup",
-  "messageId": "..."
+  "messageId": "...",
+  "status": "pending"
 }
 ```
 
-The service validates the request with zod, normalizes the phone number to digits only, sends the WhatsApp message, and stores a `pending` registry in `REGISTRY_STORE_FILE`.
+The service validates the request with zod, normalizes the phone number to digits only, sends the WhatsApp message, and stores the registry in `REGISTRY_STORE_FILE`.
 
 If the phone already exists in the JSON registry, the service sends this WhatsApp message instead of creating a new pending registry:
 
