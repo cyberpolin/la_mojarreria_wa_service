@@ -51,6 +51,15 @@ pnpm --filter @mojarreria/wa-service dev
 pnpm --filter @mojarreria/wa-service build
 pnpm --filter @mojarreria/wa-service start
 pnpm --filter @mojarreria/wa-service typecheck
+pnpm --filter @mojarreria/wa-service reset:whatsapp -- --yes
+```
+
+`reset:whatsapp` deletes `WHATSAPP_AUTH_DIR` so the next service start generates a fresh QR pairing. Stop or restart PM2 around it:
+
+```bash
+pm2 stop mojarreria-wa-service
+pnpm reset:whatsapp -- --yes
+pm2 restart mojarreria-wa-service
 ```
 
 ## Endpoints
