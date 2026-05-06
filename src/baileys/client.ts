@@ -14,6 +14,7 @@ import type { AppConfig } from "../config.js";
 import { getCampaignForPhone } from "../services/campaignStore.js";
 import { notifySubscriptionReply } from "../services/backendWebhook.js";
 import { activateDummyRegistry } from "../services/dummyRegistryApi.js";
+import { recordInboundContact } from "../services/inboundContactStore.js";
 import { activateRegistry, getRegistryRecord } from "../services/registryStore.js";
 import { phoneFromWhatsAppJid, phoneToWhatsAppJid } from "../utils/phone.js";
 
@@ -249,13 +250,22 @@ export class WhatsAppClient {
       return;
     }
 
+    const timestamp = getMessageTimestamp(message);
+    await recordInboundContact({
+      filePath: this.config.inboundContactsStoreFile,
+      phone,
+      text,
+      messageId,
+      receivedAt: timestamp
+    });
+
     const existingRecord = await getRegistryRecord(this.config.registryStoreFile, phone);
     const campaignKey = getCampaignForPhone(phone) ?? existingRecord?.campaignKey ?? null;
     const payload = {
       phone,
       text,
       messageId,
-      timestamp: getMessageTimestamp(message),
+      timestamp,
       source: "baileys" as const,
       campaignKey
     };

@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import { rememberCampaign } from "../services/campaignStore.js";
 import { savePendingToDummyRegistry } from "../services/dummyRegistryApi.js";
+import { listRecentInboundContacts } from "../services/inboundContactStore.js";
 import { getRegistryRecord, listRegistryRecords, upsertPendingRegistry } from "../services/registryStore.js";
 import { normalizePhone } from "../utils/phone.js";
 import { validateServiceRequest } from "../utils/requestAuth.js";
@@ -34,6 +35,10 @@ const broadcastMessageSchema = z.object({
 
 const listRegistrationsQuerySchema = z.object({
   status: z.enum(["pending", "active", "all"]).default("all")
+});
+
+const recentInboundQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(50).default(50)
 });
 
 export function createMessagesRouter(params: {
@@ -82,6 +87,79 @@ export function createMessagesRouter(params: {
     } catch (error) {
       params.logger.error({ err: error }, "failed to list registered phones");
       res.status(502).json({ ok: false, error: "Failed to list registrations" });
+    }
+  });
+
+  router.get("/inbound/recent", async (req: Request, res: Response) => {
+    const authResult = validateServiceRequest(req, params.config);
+    if (!authResult.ok) {
+      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      return;
+    }
+
+    const parsed = recentInboundQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        ok: false,
+        error: "Invalid query",
+        issues: parsed.error.flatten().fieldErrors
+      });
+      return;
+    }
+
+    try {
+      const contacts = await listRecentInboundContacts(params.config.inboundContactsStoreFile, parsed.data.limit);
+      res.json({
+        ok: true,
+        total: contacts.length,
+        contacts
+      });
+    } catch (error) {
+      params.logger.error({ err: error }, "failed to list recent inbound WhatsApp contacts");
+      res.status(502).json({ ok: false, error: "Failed to list recent inbound contacts" });
+    }
+  });
+
+  router.get("/inbound/recent-active-promos", async (req: Request, res: Response) => {
+    const authResult = validateServiceRequest(req, params.config);
+    if (!authResult.ok) {
+      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      return;
+    }
+
+    const parsed = recentInboundQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        ok: false,
+        error: "Invalid query",
+        issues: parsed.error.flatten().fieldErrors
+      });
+      return;
+    }
+
+    try {
+      const contacts = await listRecentInboundContacts(params.config.inboundContactsStoreFile, parsed.data.limit);
+      const activeRegistrations = (await listRegistryRecords(params.config.registryStoreFile)).filter(
+        (registration) => registration.status === "active"
+      );
+      const activeRegistrationByPhone = new Map(
+        activeRegistrations.map((registration) => [registration.phone, registration])
+      );
+      const matches = contacts
+        .map((contact) => {
+          const registration = activeRegistrationByPhone.get(contact.phone);
+          return registration ? { ...contact, registration } : null;
+        })
+        .filter((match): match is NonNullable<typeof match> => match !== null);
+
+      res.json({
+        ok: true,
+        total: matches.length,
+        contacts: matches
+      });
+    } catch (error) {
+      params.logger.error({ err: error }, "failed to list recent inbound WhatsApp contacts with active promos");
+      res.status(502).json({ ok: false, error: "Failed to list recent inbound contacts with active promos" });
     }
   });
 

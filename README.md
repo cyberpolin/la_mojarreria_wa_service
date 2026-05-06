@@ -33,6 +33,7 @@ MAIN_BACKEND_URL=https://api.lamojarreria.example
 MAIN_BACKEND_WEBHOOK_SECRET=replace-with-a-long-random-webhook-secret
 WHATSAPP_AUTH_DIR=./auth
 REGISTRY_STORE_FILE=./data/registrations.json
+INBOUND_CONTACTS_STORE_FILE=./data/inbound-contacts.json
 DUMMY_REGISTRY_API_URL=
 ```
 
@@ -187,6 +188,87 @@ Response:
       "createdAt": "2026-05-06T00:00:00.000Z",
       "updatedAt": "2026-05-06T00:05:00.000Z",
       "activatedAt": "2026-05-06T00:05:00.000Z"
+    }
+  ]
+}
+```
+
+### `GET /messages/inbound/recent`
+
+Lists the latest phone numbers that wrote to WhatsApp, ordered by last inbound message.
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+```bash
+curl "https://api.wa.lamojarreria.com/messages/inbound/recent?limit=50" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+`limit` defaults to `50` and cannot exceed `50`.
+
+Response:
+
+```json
+{
+  "ok": true,
+  "total": 1,
+  "contacts": [
+    {
+      "phone": "5219931175435",
+      "lastText": "SI",
+      "lastMessageId": "...",
+      "lastReceivedAt": "2026-05-06T00:05:00.000Z",
+      "messageCount": 2
+    }
+  ]
+}
+```
+
+### `GET /messages/inbound/recent-active-promos`
+
+Lists the latest inbound WhatsApp numbers crossed with local registrations that have `status: "active"`.
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+```bash
+curl "https://api.wa.lamojarreria.com/messages/inbound/recent-active-promos?limit=50" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "total": 1,
+  "contacts": [
+    {
+      "phone": "5219931175435",
+      "lastText": "SI",
+      "lastMessageId": "...",
+      "lastReceivedAt": "2026-05-06T00:05:00.000Z",
+      "messageCount": 2,
+      "registration": {
+        "phone": "5219931175435",
+        "name": "Carlos",
+        "campaignKey": "free_papas_signup",
+        "status": "active",
+        "createdAt": "2026-05-06T00:00:00.000Z",
+        "updatedAt": "2026-05-06T00:05:00.000Z",
+        "activatedAt": "2026-05-06T00:05:00.000Z"
+      }
     }
   ]
 }
