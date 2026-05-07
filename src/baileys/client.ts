@@ -251,7 +251,7 @@ export class WhatsAppClient {
   }
 
   private async handleIncomingMessage(message: proto.IWebMessageInfo): Promise<void> {
-    this.logger.info({ id: message.key.id, from: message.key.remoteJid }, "received WhatsApp message");
+    this.logger.info({ id: message.key.id, from: message.key }, "received WhatsApp message");
     if (message.key.fromMe) {
       return;
     }
