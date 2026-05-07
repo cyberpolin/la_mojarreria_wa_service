@@ -13,9 +13,11 @@ import qrcode from "qrcode-terminal";
 import type { AppConfig } from "../config.js";
 import { getCampaignForPhone } from "../services/campaignStore.js";
 import { notifySubscriptionReply } from "../services/backendWebhook.js";
+import { recordConversationMessage } from "../services/conversationStore.js";
 import { activateDummyRegistry } from "../services/dummyRegistryApi.js";
 import { recordInboundContact } from "../services/inboundContactStore.js";
 import { activateRegistry, getRegistryRecord } from "../services/registryStore.js";
+import { dispatchWebhookEvent } from "../services/webhookDispatcher.js";
 import { phoneFromWhatsAppJid, phoneToWhatsAppJid } from "../utils/phone.js";
 
 type MessagesUpsert = BaileysEventMap["messages.upsert"];
@@ -198,6 +200,15 @@ export class WhatsAppClient {
       throw new Error("WhatsApp did not return a message id");
     }
 
+    await recordConversationMessage({
+      filePath: this.config.conversationStoreFile,
+      phone: params.phone,
+      text: params.text,
+      messageId,
+      direction: "outbound",
+      timestamp: new Date().toISOString()
+    });
+
     return messageId;
   }
 
@@ -258,6 +269,14 @@ export class WhatsAppClient {
     }
 
     const timestamp = getMessageTimestamp(message);
+    const conversationMessage = await recordConversationMessage({
+      filePath: this.config.conversationStoreFile,
+      phone,
+      text,
+      messageId,
+      direction: "inbound",
+      timestamp
+    });
     await recordInboundContact({
       filePath: this.config.inboundContactsStoreFile,
       phone,
@@ -296,6 +315,17 @@ export class WhatsAppClient {
     } catch (error) {
       this.logger.error({ err: error, phone, messageId }, "failed to forward WhatsApp reply");
     }
+
+    await dispatchWebhookEvent({
+      filePath: this.config.webhookSubscriptionsFile,
+      logger: this.logger,
+      event: "message.received",
+      payload: {
+        event: "message.received",
+        provider: "baileys",
+        message: conversationMessage
+      }
+    });
   }
 
   private getPhoneFromRemoteJid(remoteJid: string): string | null {

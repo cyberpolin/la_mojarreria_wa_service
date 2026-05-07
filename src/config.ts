@@ -15,6 +15,8 @@ const envSchema = z.object({
   WHATSAPP_AUTH_DIR: z.string().min(1).default("./auth"),
   REGISTRY_STORE_FILE: z.string().min(1).default("./data/registrations.json"),
   INBOUND_CONTACTS_STORE_FILE: z.string().min(1).default("./data/inbound-contacts.json"),
+  CONVERSATION_STORE_FILE: z.string().min(1).default("./data/conversations.json"),
+  WEBHOOK_SUBSCRIPTIONS_FILE: z.string().min(1).default("./data/webhook-subscriptions.json"),
   DUMMY_REGISTRY_API_URL: z.string().url().optional().or(z.literal(""))
 });
 
@@ -31,6 +33,8 @@ export const config = {
   whatsappAuthDir: env.WHATSAPP_AUTH_DIR,
   registryStoreFile: env.REGISTRY_STORE_FILE,
   inboundContactsStoreFile: env.INBOUND_CONTACTS_STORE_FILE,
+  conversationStoreFile: env.CONVERSATION_STORE_FILE,
+  webhookSubscriptionsFile: env.WEBHOOK_SUBSCRIPTIONS_FILE,
   dummyRegistryApiUrl: env.DUMMY_REGISTRY_API_URL ? env.DUMMY_REGISTRY_API_URL.replace(/\/+$/, "") : null
 } as const;
 

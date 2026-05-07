@@ -22,6 +22,10 @@ function parseDomainHeader(value: string): string | null {
   }
 }
 
+export function getDomainFromRequestOrigin(value: string): string | null {
+  return parseDomainHeader(value);
+}
+
 function getRequestDomain(req: Request): string | null {
   const explicitDomain = req.header("x-client-domain");
   if (explicitDomain) {
@@ -43,6 +47,10 @@ function getRequestDomain(req: Request): string | null {
 
 function isAllowedDomain(domain: string, allowedDomains: readonly string[]): boolean {
   return allowedDomains.some((allowedDomain) => domain === allowedDomain || domain.endsWith(`.${allowedDomain}`));
+}
+
+export function isAllowedRequestDomain(domain: string, allowedDomains: readonly string[]): boolean {
+  return isAllowedDomain(domain, allowedDomains);
 }
 
 export function validateServiceRequest(req: Request, config: AppConfig): RequestAuthResult {

@@ -34,6 +34,8 @@ MAIN_BACKEND_WEBHOOK_SECRET=replace-with-a-long-random-webhook-secret
 WHATSAPP_AUTH_DIR=./auth
 REGISTRY_STORE_FILE=./data/registrations.json
 INBOUND_CONTACTS_STORE_FILE=./data/inbound-contacts.json
+CONVERSATION_STORE_FILE=./data/conversations.json
+WEBHOOK_SUBSCRIPTIONS_FILE=./data/webhook-subscriptions.json
 DUMMY_REGISTRY_API_URL=
 ```
 
@@ -87,6 +89,8 @@ x-client-domain: lamojarreria.com
 ```
 
 The trusted domain can also come from `Origin` or `Referer`, but server-to-server callers should send `x-client-domain` explicitly. Use `x-client-domain: localhost` for local client testing.
+
+Browser clients from local dev origins such as `http://localhost:5173` are allowed when `SERVICE_ALLOWED_DOMAINS` includes `localhost`. The service uses the hostname for validation, so the port does not need to be listed separately.
 
 ```bash
 curl -X POST https://api.wa.lamojarreria.com/messages/subscription \
@@ -384,6 +388,140 @@ https://api.wa.lamojarreria.com/whatsapp/qr?apiKey=SERVICE_API_KEY&clientDomain=
 ```
 
 Prefer headers from application code. Query params can be captured by browser history and server logs.
+
+## Stage 2: Generic WhatsApp API
+
+The `/v1` routes are CRM-agnostic. They expose WhatsApp operations directly: send messages, inspect conversations, read the latest message, and subscribe external systems to message webhooks. Stage 1 subscription endpoints stay available under `/messages/*`.
+
+All protected `/v1` endpoints use:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+### `GET /v1/health`
+
+```bash
+curl https://api.wa.lamojarreria.com/v1/health
+```
+
+### `GET /v1/whatsapp/status`
+
+```bash
+curl https://api.wa.lamojarreria.com/v1/whatsapp/status \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+### `GET /v1/whatsapp/qr`
+
+```bash
+curl https://api.wa.lamojarreria.com/v1/whatsapp/qr \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+Returns `qr` and `qrImage` as a base64 PNG data URL when pairing is needed.
+
+### `POST /v1/messages/send`
+
+```bash
+curl -X POST https://api.wa.lamojarreria.com/v1/messages/send \
+  -H "content-type: application/json" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com" \
+  -d '{
+    "to": "529931175435",
+    "text": "Hola, tu pedido esta listo."
+  }'
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "to": "5219931175435",
+  "messageId": "..."
+}
+```
+
+### `GET /v1/conversations`
+
+Lists recent conversations, ordered by last message.
+
+```bash
+curl "https://api.wa.lamojarreria.com/v1/conversations?limit=50" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+### `GET /v1/conversations/:phone/messages`
+
+```bash
+curl "https://api.wa.lamojarreria.com/v1/conversations/529931175435/messages?limit=50" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+### `GET /v1/conversations/:phone/last-message`
+
+```bash
+curl "https://api.wa.lamojarreria.com/v1/conversations/529931175435/last-message" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+### `GET /v1/webhooks/subscriptions`
+
+```bash
+curl https://api.wa.lamojarreria.com/v1/webhooks/subscriptions \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+### `POST /v1/webhooks/subscriptions`
+
+Subscribes an external service to WhatsApp events.
+
+```bash
+curl -X POST https://api.wa.lamojarreria.com/v1/webhooks/subscriptions \
+  -H "content-type: application/json" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com" \
+  -d '{
+    "url": "https://crm.lamojarreria.com/api/whatsapp/events",
+    "events": ["message.received"],
+    "secret": "optional-shared-secret"
+  }'
+```
+
+When a user writes to WhatsApp, active subscribers receive:
+
+```json
+{
+  "event": "message.received",
+  "provider": "baileys",
+  "message": {
+    "id": "...",
+    "phone": "5219931175435",
+    "text": "Hola",
+    "direction": "inbound",
+    "timestamp": "2026-05-07T00:00:00.000Z"
+  }
+}
+```
+
+Webhook headers include `x-wa-service-event: message.received`. If a subscription has `secret`, the request also includes `x-wa-service-secret`.
+
+### `DELETE /v1/webhooks/subscriptions/:id`
+
+```bash
+curl -X DELETE https://api.wa.lamojarreria.com/v1/webhooks/subscriptions/SUBSCRIPTION_ID \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
 
 ## Reply Webhook
 
