@@ -250,7 +250,7 @@ export class WhatsAppClient {
     await Promise.all(event.messages.map((message) => this.handleIncomingMessage(message)));
   }
 
-  private async handleIncomingMessage(message: proto.IWebMessageInfo): Promise<void> {
+  private async handleIncomingMessage(message: proto.IWebMessageInfo & { key: { senderPn?: string  } }): Promise<void> {
     if (message.key.fromMe) {
       return;
     }
@@ -260,11 +260,11 @@ export class WhatsAppClient {
       return;
     }
     
-    const phone = this.getPhoneFromRemoteJid(remoteJid)
+    const phone = message.key.senderPn?.split("@")[0] ?? phoneFromWhatsAppJid(remoteJid);
     const text = getMessageText(message.message);
     const messageId = message.key.id;
     
-    this.logger.info({ id: message.key.id, from: phone, text, json:JSON.stringify(message, null, 2) }, "received WhatsApp message");
+    this.logger.info({ id: message.key.id, from: message.key.senderPn,phone, text, json:JSON.stringify(message, null, 2) }, "received WhatsApp message");
     if (!phone || !text || !messageId) {
       return;
     }
