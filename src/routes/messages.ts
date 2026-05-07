@@ -90,6 +90,46 @@ export function createMessagesRouter(params: {
     }
   });
 
+  router.get("/registrations/:phone/status", async (req: Request, res: Response) => {
+    const authResult = validateServiceRequest(req, params.config);
+    if (!authResult.ok) {
+      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      return;
+    }
+
+    let phone: string;
+    try {
+      phone = normalizePhone(req.params.phone ?? "");
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid phone" });
+      return;
+    }
+
+    try {
+      const record = await getRegistryRecord(params.config.registryStoreFile, phone);
+      if (!record) {
+        res.status(404).json({
+          ok: false,
+          phone,
+          campaignKey: null,
+          status: null,
+          error: "Registration not found"
+        });
+        return;
+      }
+
+      res.json({
+        ok: true,
+        phone,
+        campaignKey: record.campaignKey,
+        status: record.status
+      });
+    } catch (error) {
+      params.logger.error({ err: error, phone }, "failed to get registration status");
+      res.status(502).json({ ok: false, error: "Failed to get registration status" });
+    }
+  });
+
   router.get("/inbound/recent", async (req: Request, res: Response) => {
     const authResult = validateServiceRequest(req, params.config);
     if (!authResult.ok) {

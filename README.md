@@ -197,6 +197,34 @@ Response:
 }
 ```
 
+### `GET /messages/registrations/:phone/status`
+
+Returns the promo status for one registered phone.
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+```bash
+curl "https://api.wa.lamojarreria.com/messages/registrations/529931175435/status" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "phone": "5219931175435",
+  "campaignKey": "free_papas_signup",
+  "status": "active"
+}
+```
+
 ### `GET /messages/inbound/recent`
 
 Lists the latest phone numbers that wrote to WhatsApp, ordered by last inbound message.
