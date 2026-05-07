@@ -264,7 +264,7 @@ export class WhatsAppClient {
     const text = getMessageText(message.message);
     const messageId = message.key.id;
     
-    this.logger.info({ id: message.key.id, from: message.key.senderPn,phone, text, json:JSON.stringify(message, null, 2) }, "received WhatsApp message");
+    this.logger.info({ id: message.key.id,phone, text, json:JSON.stringify(message, null, 2) }, "received WhatsApp message");
     if (!phone || !text || !messageId) {
       return;
     }

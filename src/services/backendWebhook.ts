@@ -15,6 +15,8 @@ export async function notifySubscriptionReply(
   logger: Logger,
   payload: SubscriptionReplyWebhookPayload
 ): Promise<void> {
+  console.log('Disable so far to avoid errors until the main backend endpoint is ready');
+  return;
   const url = `${config.mainBackendUrl}/webhooks/whatsapp/subscription-reply`;
 
   const response = await fetch(url, {
