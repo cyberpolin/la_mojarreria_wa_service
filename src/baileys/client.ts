@@ -260,11 +260,11 @@ export class WhatsAppClient {
       return;
     }
     
-    const phone = this.getPhoneFromRemoteJid(remoteJid);
+    const phone = this.getPhoneFromRemoteJid(remoteJid)
     const text = getMessageText(message.message);
     const messageId = message.key.id;
     
-    this.logger.info({ id: message.key.id, from: phone, text }, "received WhatsApp message");
+    this.logger.info({ id: message.key.id, from: phone, text, json:JSON.stringify(message, null, 2) }, "received WhatsApp message");
     if (!phone || !text || !messageId) {
       return;
     }
