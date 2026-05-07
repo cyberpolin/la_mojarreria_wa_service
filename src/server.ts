@@ -18,8 +18,25 @@ export function createServer(params: {
   app.use((req, res, next) => {
     const origin = req.header("origin");
     const originDomain = origin ? getDomainFromRequestOrigin(origin) : null;
+    const allowedOrigin =
+      originDomain !== null && isAllowedRequestDomain(originDomain, params.config.serviceAllowedDomains);
 
-    if (origin && originDomain && isAllowedRequestDomain(originDomain, params.config.serviceAllowedDomains)) {
+    if (origin) {
+      const logPayload = {
+        origin,
+        originDomain,
+        allowedOrigin,
+        allowedDomains: params.config.serviceAllowedDomains
+      };
+
+      if (allowedOrigin) {
+        params.logger.info(logPayload, "CORS origin allowed");
+      } else {
+        params.logger.warn(logPayload, "CORS origin blocked");
+      }
+    }
+
+    if (origin && allowedOrigin) {
       res.header("access-control-allow-origin", origin);
       res.header("vary", "Origin");
       res.header("access-control-allow-methods", "GET,POST,DELETE,OPTIONS");
