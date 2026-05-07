@@ -251,20 +251,20 @@ export class WhatsAppClient {
   }
 
   private async handleIncomingMessage(message: proto.IWebMessageInfo): Promise<void> {
-    this.logger.info({ id: message.key.id, from: message.key }, "received WhatsApp message");
     if (message.key.fromMe) {
       return;
     }
-
+    
     const remoteJid = message.key.remoteJid;
     if (!remoteJid || remoteJid.endsWith("@g.us")) {
       return;
     }
-
+    
     const phone = this.getPhoneFromRemoteJid(remoteJid);
     const text = getMessageText(message.message);
     const messageId = message.key.id;
-
+    
+    this.logger.info({ id: message.key.id, from: phone, text }, "received WhatsApp message");
     if (!phone || !text || !messageId) {
       return;
     }
