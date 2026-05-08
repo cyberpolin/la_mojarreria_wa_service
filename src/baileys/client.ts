@@ -1,6 +1,7 @@
 import {
   DisconnectReason,
   fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
   makeWASocket,
   useMultiFileAuthState,
   type AnyMessageContent,
@@ -117,11 +118,15 @@ export class WhatsAppClient {
       this.config.whatsappAuthDir,
     );
     const { version } = await fetchLatestBaileysVersion();
+    const baileysLogger = this.logger.child({ module: "baileys" });
 
     const socket = makeWASocket({
       version,
-      auth: state,
-      logger: this.logger.child({ module: "baileys" }),
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, baileysLogger),
+      },
+      logger: baileysLogger,
       browser: ["La Mojarreria", "Chrome", "1.0.0"],
       markOnlineOnConnect: false,
       retryRequestDelayMs: 500,
