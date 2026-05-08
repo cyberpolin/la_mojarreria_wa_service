@@ -35,7 +35,12 @@ async function readData(filePath: string): Promise<WebhookSubscriptionData> {
 
     return { subscriptions: parsed.subscriptions };
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
       return emptyData();
     }
 
@@ -43,7 +48,10 @@ async function readData(filePath: string): Promise<WebhookSubscriptionData> {
   }
 }
 
-async function writeData(filePath: string, data: WebhookSubscriptionData): Promise<void> {
+async function writeData(
+  filePath: string,
+  data: WebhookSubscriptionData,
+): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
@@ -52,13 +60,15 @@ function enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
   const next = writeQueue.then(operation, operation);
   writeQueue = next.then(
     () => undefined,
-    () => undefined
+    () => undefined,
   );
 
   return next;
 }
 
-export async function listWebhookSubscriptions(filePath: string): Promise<WebhookSubscription[]> {
+export async function listWebhookSubscriptions(
+  filePath: string,
+): Promise<WebhookSubscription[]> {
   const data = await readData(filePath);
   return data.subscriptions;
 }
@@ -79,7 +89,7 @@ export async function createWebhookSubscription(params: {
       secret: params.secret,
       active: true,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     data.subscriptions.push(subscription);
@@ -88,11 +98,16 @@ export async function createWebhookSubscription(params: {
   });
 }
 
-export async function deleteWebhookSubscription(filePath: string, id: string): Promise<boolean> {
+export async function deleteWebhookSubscription(
+  filePath: string,
+  id: string,
+): Promise<boolean> {
   return enqueueWrite(async () => {
     const data = await readData(filePath);
     const before = data.subscriptions.length;
-    data.subscriptions = data.subscriptions.filter((subscription) => subscription.id !== id);
+    data.subscriptions = data.subscriptions.filter(
+      (subscription) => subscription.id !== id,
+    );
 
     if (data.subscriptions.length === before) {
       return false;

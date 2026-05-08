@@ -13,9 +13,11 @@ export type SubscriptionReplyWebhookPayload = {
 export async function notifySubscriptionReply(
   config: AppConfig,
   logger: Logger,
-  payload: SubscriptionReplyWebhookPayload
+  payload: SubscriptionReplyWebhookPayload,
 ): Promise<void> {
-  console.log('Disable so far to avoid errors until the main backend endpoint is ready');
+  console.log(
+    "Disable so far to avoid errors until the main backend endpoint is ready",
+  );
   return;
   const url = `${config.mainBackendUrl}/webhooks/whatsapp/subscription-reply`;
 
@@ -23,9 +25,9 @@ export async function notifySubscriptionReply(
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-webhook-secret": config.mainBackendWebhookSecret
+      "x-webhook-secret": config.mainBackendWebhookSecret,
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -36,9 +38,9 @@ export async function notifySubscriptionReply(
         statusText: response.statusText,
         responseText,
         phone: payload.phone,
-        messageId: payload.messageId
+        messageId: payload.messageId,
       },
-      "main backend webhook rejected WhatsApp reply"
+      "main backend webhook rejected WhatsApp reply",
     );
     throw new Error(`Backend webhook failed with status ${response.status}`);
   }

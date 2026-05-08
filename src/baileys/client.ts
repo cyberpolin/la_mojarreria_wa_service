@@ -6,7 +6,7 @@ import {
   type AnyMessageContent,
   type BaileysEventMap,
   type WASocket,
-  type proto
+  type proto,
 } from "@whiskeysockets/baileys";
 import type { Logger } from "pino";
 import qrcode from "qrcode-terminal";
@@ -16,11 +16,16 @@ import { notifySubscriptionReply } from "../services/backendWebhook.js";
 import { recordConversationMessage } from "../services/conversationStore.js";
 import { activateDummyRegistry } from "../services/dummyRegistryApi.js";
 import { recordInboundContact } from "../services/inboundContactStore.js";
-import { activateRegistry, getRegistryRecord } from "../services/registryStore.js";
+import {
+  activateRegistry,
+  getRegistryRecord,
+} from "../services/registryStore.js";
 import { dispatchWebhookEvent } from "../services/webhookDispatcher.js";
 import { phoneFromWhatsAppJid, phoneToWhatsAppJid } from "../utils/phone.js";
 
 type MessagesUpsert = BaileysEventMap["messages.upsert"];
+type MessagesUpdate = BaileysEventMap["messages.update"];
+type MessageReceiptUpdate = BaileysEventMap["message-receipt.update"];
 
 function getDisconnectStatusCode(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) {
@@ -28,14 +33,20 @@ function getDisconnectStatusCode(error: unknown): number | undefined {
   }
 
   const output = "output" in error ? error.output : undefined;
-  if (typeof output !== "object" || output === null || !("statusCode" in output)) {
+  if (
+    typeof output !== "object" ||
+    output === null ||
+    !("statusCode" in output)
+  ) {
     return undefined;
   }
 
   return typeof output.statusCode === "number" ? output.statusCode : undefined;
 }
 
-function getMessageText(message: proto.IMessage | null | undefined): string | null {
+function getMessageText(
+  message: proto.IMessage | null | undefined,
+): string | null {
   if (!message) {
     return null;
   }
@@ -92,23 +103,31 @@ export class WhatsAppClient {
   private latestQr: string | null = null;
   private connectionStatus: "connecting" | "open" | "close" = "connecting";
   private phoneByLid = new Map<string, string>();
+  private messageCache = new Map<string, proto.IMessage>();
 
   constructor(
     private readonly config: AppConfig,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   async start(): Promise<void> {
     this.isStopping = false;
 
-    const { state, saveCreds } = await useMultiFileAuthState(this.config.whatsappAuthDir);
+    const { state, saveCreds } = await useMultiFileAuthState(
+      this.config.whatsappAuthDir,
+    );
     const { version } = await fetchLatestBaileysVersion();
 
     const socket = makeWASocket({
       version,
       auth: state,
       logger: this.logger.child({ module: "baileys" }),
-      browser: ["La Mojarreria", "Chrome", "1.0.0"]
+      browser: ["La Mojarreria", "Chrome", "1.0.0"],
+      markOnlineOnConnect: false,
+      retryRequestDelayMs: 500,
+      maxMsgRetryCount: 5,
+      getMessage: async (key) =>
+        key.id ? this.messageCache.get(key.id) : undefined,
     });
 
     this.socket = socket;
@@ -117,7 +136,9 @@ export class WhatsAppClient {
     socket.ev.on("connection.update", (update) => {
       if (update.qr) {
         this.latestQr = update.qr;
-        this.logger.info("Scan this QR code with WhatsApp to connect the service");
+        this.logger.info(
+          "Scan this QR code with WhatsApp to connect the service",
+        );
         qrcode.generate(update.qr, { small: true });
       }
 
@@ -129,10 +150,15 @@ export class WhatsAppClient {
 
       if (update.connection === "close") {
         this.connectionStatus = "close";
-        const statusCode = getDisconnectStatusCode(update.lastDisconnect?.error);
+        const statusCode = getDisconnectStatusCode(
+          update.lastDisconnect?.error,
+        );
         const loggedOut = statusCode === DisconnectReason.loggedOut;
 
-        this.logger.warn({ statusCode, loggedOut }, "WhatsApp socket disconnected");
+        this.logger.warn(
+          { statusCode, loggedOut },
+          "WhatsApp socket disconnected",
+        );
 
         if (!this.isStopping && !loggedOut) {
           this.scheduleReconnect();
@@ -142,6 +168,12 @@ export class WhatsAppClient {
 
     socket.ev.on("messages.upsert", (event) => {
       void this.handleMessagesUpsert(event);
+    });
+    socket.ev.on("messages.update", (updates) => {
+      this.handleMessagesUpdate(updates);
+    });
+    socket.ev.on("message-receipt.update", (updates) => {
+      this.handleMessageReceiptUpdate(updates);
     });
     socket.ev.on("chats.phoneNumberShare", ({ lid, jid }) => {
       const phone = phoneFromWhatsAppJid(jid);
@@ -171,7 +203,7 @@ export class WhatsAppClient {
   }): Promise<string> {
     return this.sendTextMessage({
       phone: params.phone,
-      text: `Hola ${params.name}, gracias por registrarte en La Mojarrería. Responde SI para confirmar tu registro y recibir tus papas gratis.`
+      text: `Hola ${params.name}, gracias por registrarte en La Mojarrería. Responde SI para confirmar tu registro y recibir tus papas gratis.`,
     });
   }
 
@@ -180,24 +212,40 @@ export class WhatsAppClient {
   }): Promise<string> {
     return this.sendTextMessage({
       phone: params.phone,
-      text: "Este número ya está registrado. Si aún no has pedido tus papas gratis, solo haz un pedido. Si ya las usaste, estate pendiente, pronto te enviaremos promociones."
+      text: "Este número ya está registrado. Si aún no has pedido tus papas gratis, solo haz un pedido. Si ya las usaste, estate pendiente, pronto te enviaremos promociones.",
     });
   }
 
-  async sendTextMessage(params: { phone: string; text: string }): Promise<string> {
+  async sendTextMessage(params: {
+    phone: string;
+    text: string;
+  }): Promise<string> {
     if (!this.socket) {
       throw new Error("WhatsApp socket is not initialized");
     }
 
+    if (this.connectionStatus !== "open") {
+      throw new Error(
+        `WhatsApp socket is not connected; current status is ${this.connectionStatus}`,
+      );
+    }
+
     const content: AnyMessageContent = {
-      text: params.text
+      text: params.text,
     };
 
-    const response = await this.socket.sendMessage(phoneToWhatsAppJid(params.phone), content);
+    const response = await this.socket.sendMessage(
+      phoneToWhatsAppJid(params.phone),
+      content,
+    );
     const messageId = response?.key.id;
 
     if (!messageId) {
       throw new Error("WhatsApp did not return a message id");
+    }
+
+    if (response.message) {
+      this.rememberMessage(messageId, response.message);
     }
 
     await recordConversationMessage({
@@ -206,7 +254,7 @@ export class WhatsAppClient {
       text: params.text,
       messageId,
       direction: "outbound",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     return messageId;
@@ -220,7 +268,7 @@ export class WhatsAppClient {
     return {
       connected: this.connectionStatus === "open",
       connection: this.connectionStatus,
-      hasQr: this.latestQr !== null
+      hasQr: this.latestQr !== null,
     };
   }
 
@@ -236,7 +284,10 @@ export class WhatsAppClient {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       void this.start().catch((error: unknown) => {
-        this.logger.error({ err: error }, "failed to reconnect WhatsApp socket");
+        this.logger.error(
+          { err: error },
+          "failed to reconnect WhatsApp socket",
+        );
         this.scheduleReconnect();
       });
     }, 5000);
@@ -247,24 +298,73 @@ export class WhatsAppClient {
       return;
     }
 
-    await Promise.all(event.messages.map((message) => this.handleIncomingMessage(message)));
+    await Promise.all(
+      event.messages.map((message) => this.handleIncomingMessage(message)),
+    );
   }
 
-  private async handleIncomingMessage(message: proto.IWebMessageInfo & { key: { senderPn?: string  } }): Promise<void> {
+  private handleMessagesUpdate(updates: MessagesUpdate): void {
+    for (const { key, update } of updates) {
+      if (key.id && update.message) {
+        this.rememberMessage(key.id, update.message);
+      }
+
+      this.logger.info(
+        {
+          messageId: key.id,
+          remoteJid: key.remoteJid,
+          fromMe: key.fromMe,
+          status: update.status,
+        },
+        "WhatsApp message update",
+      );
+    }
+  }
+
+  private handleMessageReceiptUpdate(updates: MessageReceiptUpdate): void {
+    for (const { key, receipt } of updates) {
+      this.logger.info(
+        {
+          messageId: key.id,
+          remoteJid: key.remoteJid,
+          fromMe: key.fromMe,
+          receipt,
+        },
+        "WhatsApp message receipt update",
+      );
+    }
+  }
+
+  private async handleIncomingMessage(
+    message: proto.IWebMessageInfo & { key: { senderPn?: string } },
+  ): Promise<void> {
     if (message.key.fromMe) {
       return;
     }
-    
+
     const remoteJid = message.key.remoteJid;
     if (!remoteJid || remoteJid.endsWith("@g.us")) {
       return;
     }
-    
-    const phone = message.key.senderPn?.split("@")[0] ?? phoneFromWhatsAppJid(remoteJid);
+
+    const phone =
+      message.key.senderPn?.split("@")[0] ?? phoneFromWhatsAppJid(remoteJid);
     const text = getMessageText(message.message);
     const messageId = message.key.id;
-    
-    this.logger.info({ id: message.key.id,phone, text, json:JSON.stringify(message, null, 2) }, "received WhatsApp message");
+
+    if (messageId && message.message) {
+      this.rememberMessage(messageId, message.message);
+    }
+
+    this.logger.info(
+      {
+        id: message.key.id,
+        phone,
+        text,
+        json: JSON.stringify(message, null, 2),
+      },
+      "received WhatsApp message",
+    );
     if (!phone || !text || !messageId) {
       return;
     }
@@ -276,45 +376,55 @@ export class WhatsAppClient {
       text,
       messageId,
       direction: "inbound",
-      timestamp
+      timestamp,
     });
     await recordInboundContact({
       filePath: this.config.inboundContactsStoreFile,
       phone,
       text,
       messageId,
-      receivedAt: timestamp
+      receivedAt: timestamp,
     });
 
-    const existingRecord = await getRegistryRecord(this.config.registryStoreFile, phone);
-    const campaignKey = getCampaignForPhone(phone) ?? existingRecord?.campaignKey ?? null;
+    const existingRecord = await getRegistryRecord(
+      this.config.registryStoreFile,
+      phone,
+    );
+    const campaignKey =
+      getCampaignForPhone(phone) ?? existingRecord?.campaignKey ?? null;
     const payload = {
       phone,
       text,
       messageId,
       timestamp,
       source: "baileys" as const,
-      campaignKey
+      campaignKey,
     };
 
     const registryRecord = await activateRegistry({
       filePath: this.config.registryStoreFile,
       phone,
-      campaignKey: payload.campaignKey
+      campaignKey: payload.campaignKey,
     });
     if (registryRecord) {
       await activateDummyRegistry({
         baseUrl: this.config.dummyRegistryApiUrl,
         logger: this.logger,
-        record: registryRecord
+        record: registryRecord,
       });
     }
 
     try {
       await notifySubscriptionReply(this.config, this.logger, payload);
-      this.logger.info({ phone, messageId }, "forwarded WhatsApp reply to main backend");
+      this.logger.info(
+        { phone, messageId },
+        "forwarded WhatsApp reply to main backend",
+      );
     } catch (error) {
-      this.logger.error({ err: error, phone, messageId }, "failed to forward WhatsApp reply");
+      this.logger.error(
+        { err: error, phone, messageId },
+        "failed to forward WhatsApp reply",
+      );
     }
 
     await dispatchWebhookEvent({
@@ -324,12 +434,27 @@ export class WhatsAppClient {
       payload: {
         event: "message.received",
         provider: "baileys",
-        message: conversationMessage
-      }
+        message: conversationMessage,
+      },
     });
   }
 
   private getPhoneFromRemoteJid(remoteJid: string): string | null {
-    return phoneFromWhatsAppJid(remoteJid) ?? this.phoneByLid.get(remoteJid) ?? null;
+    return (
+      phoneFromWhatsAppJid(remoteJid) ?? this.phoneByLid.get(remoteJid) ?? null
+    );
+  }
+
+  private rememberMessage(messageId: string, message: proto.IMessage): void {
+    this.messageCache.set(messageId, message);
+
+    if (this.messageCache.size <= 500) {
+      return;
+    }
+
+    const oldestMessageId = this.messageCache.keys().next().value;
+    if (oldestMessageId) {
+      this.messageCache.delete(oldestMessageId);
+    }
   }
 }

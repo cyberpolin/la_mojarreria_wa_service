@@ -30,7 +30,12 @@ async function readData(filePath: string): Promise<InboundContactData> {
 
     return { contacts: parsed.contacts };
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
       return emptyData();
     }
 
@@ -38,7 +43,10 @@ async function readData(filePath: string): Promise<InboundContactData> {
   }
 }
 
-async function writeData(filePath: string, data: InboundContactData): Promise<void> {
+async function writeData(
+  filePath: string,
+  data: InboundContactData,
+): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
@@ -47,7 +55,7 @@ function enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
   const next = writeQueue.then(operation, operation);
   writeQueue = next.then(
     () => undefined,
-    () => undefined
+    () => undefined,
   );
 
   return next;
@@ -62,13 +70,15 @@ export async function recordInboundContact(params: {
 }): Promise<InboundContact> {
   return enqueueWrite(async () => {
     const data = await readData(params.filePath);
-    const existing = data.contacts.find((contact) => contact.phone === params.phone);
+    const existing = data.contacts.find(
+      (contact) => contact.phone === params.phone,
+    );
     const nextContact: InboundContact = {
       phone: params.phone,
       lastText: params.text,
       lastMessageId: params.messageId,
       lastReceivedAt: params.receivedAt,
-      messageCount: (existing?.messageCount ?? 0) + 1
+      messageCount: (existing?.messageCount ?? 0) + 1,
     };
 
     if (existing) {
@@ -82,9 +92,14 @@ export async function recordInboundContact(params: {
   });
 }
 
-export async function listRecentInboundContacts(filePath: string, limit = 50): Promise<InboundContact[]> {
+export async function listRecentInboundContacts(
+  filePath: string,
+  limit = 50,
+): Promise<InboundContact[]> {
   const data = await readData(filePath);
   return [...data.contacts]
-    .sort((left, right) => right.lastReceivedAt.localeCompare(left.lastReceivedAt))
+    .sort((left, right) =>
+      right.lastReceivedAt.localeCompare(left.lastReceivedAt),
+    )
     .slice(0, limit);
 }

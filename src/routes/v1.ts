@@ -6,33 +6,40 @@ import type { WhatsAppClient } from "../baileys/client.js";
 import {
   getLastConversationMessage,
   listConversationMessages,
-  listConversations
+  listConversations,
 } from "../services/conversationStore.js";
 import {
   createWebhookSubscription,
   deleteWebhookSubscription,
   listWebhookSubscriptions,
-  type WebhookEventName
+  type WebhookEventName,
 } from "../services/webhookSubscriptionStore.js";
 import { normalizePhone } from "../utils/phone.js";
 import { validateServiceRequest } from "../utils/requestAuth.js";
 
 const limitQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(100).default(50)
+  limit: z.coerce.number().int().positive().max(100).default(50),
 });
 
 const sendMessageSchema = z.object({
   to: z.string().trim().min(10).max(20),
-  text: z.string().trim().min(1).max(4000)
+  text: z.string().trim().min(1).max(4000),
 });
 
 const webhookSubscriptionSchema = z.object({
   url: z.string().url(),
-  events: z.array(z.enum(["message.received"])).min(1).default(["message.received"]),
-  secret: z.string().trim().min(1).max(500).optional()
+  events: z
+    .array(z.enum(["message.received"]))
+    .min(1)
+    .default(["message.received"]),
+  secret: z.string().trim().min(1).max(500).optional(),
 });
 
-function ensureAuthorized(req: Request, res: Response, config: AppConfig): boolean {
+function ensureAuthorized(
+  req: Request,
+  res: Response,
+  config: AppConfig,
+): boolean {
   const authResult = validateServiceRequest(req, config);
   if (!authResult.ok) {
     res.status(authResult.status).json({ ok: false, error: authResult.error });
@@ -46,7 +53,12 @@ function parsePhoneParam(req: Request, res: Response): string | null {
   try {
     return normalizePhone(req.params.phone ?? "");
   } catch (error) {
-    res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid phone" });
+    res
+      .status(400)
+      .json({
+        ok: false,
+        error: error instanceof Error ? error.message : "Invalid phone",
+      });
     return null;
   }
 }
@@ -79,7 +91,7 @@ export function createV1Router(params: {
       ? await QRCode.toDataURL(qr, {
           margin: 2,
           width: 320,
-          errorCorrectionLevel: "M"
+          errorCorrectionLevel: "M",
         })
       : null;
 
@@ -87,7 +99,7 @@ export function createV1Router(params: {
       ok: true,
       qr,
       qrImage,
-      ...params.whatsAppClient.getStatus()
+      ...params.whatsAppClient.getStatus(),
     });
   });
 
@@ -101,7 +113,7 @@ export function createV1Router(params: {
       res.status(400).json({
         ok: false,
         error: "Invalid request body",
-        issues: parsed.error.flatten().fieldErrors
+        issues: parsed.error.flatten().fieldErrors,
       });
       return;
     }
@@ -110,12 +122,18 @@ export function createV1Router(params: {
       const phone = normalizePhone(parsed.data.to);
       const messageId = await params.whatsAppClient.sendTextMessage({
         phone,
-        text: parsed.data.text
+        text: parsed.data.text,
       });
 
       res.json({ ok: true, to: phone, messageId });
     } catch (error) {
-      res.status(502).json({ ok: false, error: error instanceof Error ? error.message : "Failed to send message" });
+      res
+        .status(502)
+        .json({
+          ok: false,
+          error:
+            error instanceof Error ? error.message : "Failed to send message",
+        });
     }
   });
 
@@ -126,105 +144,137 @@ export function createV1Router(params: {
 
     const parsed = limitQuerySchema.safeParse(req.query);
     if (!parsed.success) {
-      res.status(400).json({ ok: false, error: "Invalid query", issues: parsed.error.flatten().fieldErrors });
+      res
+        .status(400)
+        .json({
+          ok: false,
+          error: "Invalid query",
+          issues: parsed.error.flatten().fieldErrors,
+        });
       return;
     }
 
-    const conversations = await listConversations(params.config.conversationStoreFile, parsed.data.limit);
+    const conversations = await listConversations(
+      params.config.conversationStoreFile,
+      parsed.data.limit,
+    );
     res.json({ ok: true, total: conversations.length, conversations });
   });
 
-  router.get("/conversations/:phone/messages", async (req: Request, res: Response) => {
-    if (!ensureAuthorized(req, res, params.config)) {
-      return;
-    }
+  router.get(
+    "/conversations/:phone/messages",
+    async (req: Request, res: Response) => {
+      if (!ensureAuthorized(req, res, params.config)) {
+        return;
+      }
 
-    const phone = parsePhoneParam(req, res);
-    if (!phone) {
-      return;
-    }
+      const phone = parsePhoneParam(req, res);
+      if (!phone) {
+        return;
+      }
 
-    const parsed = limitQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ ok: false, error: "Invalid query", issues: parsed.error.flatten().fieldErrors });
-      return;
-    }
+      const parsed = limitQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res
+          .status(400)
+          .json({
+            ok: false,
+            error: "Invalid query",
+            issues: parsed.error.flatten().fieldErrors,
+          });
+        return;
+      }
 
-    const messages = await listConversationMessages({
-      filePath: params.config.conversationStoreFile,
-      phone,
-      limit: parsed.data.limit
-    });
+      const messages = await listConversationMessages({
+        filePath: params.config.conversationStoreFile,
+        phone,
+        limit: parsed.data.limit,
+      });
 
-    res.json({ ok: true, phone, total: messages.length, messages });
-  });
+      res.json({ ok: true, phone, total: messages.length, messages });
+    },
+  );
 
-  router.get("/conversations/:phone/last-message", async (req: Request, res: Response) => {
-    if (!ensureAuthorized(req, res, params.config)) {
-      return;
-    }
+  router.get(
+    "/conversations/:phone/last-message",
+    async (req: Request, res: Response) => {
+      if (!ensureAuthorized(req, res, params.config)) {
+        return;
+      }
 
-    const phone = parsePhoneParam(req, res);
-    if (!phone) {
-      return;
-    }
+      const phone = parsePhoneParam(req, res);
+      if (!phone) {
+        return;
+      }
 
-    const message = await getLastConversationMessage({
-      filePath: params.config.conversationStoreFile,
-      phone
-    });
+      const message = await getLastConversationMessage({
+        filePath: params.config.conversationStoreFile,
+        phone,
+      });
 
-    res.json({ ok: true, phone, message });
-  });
+      res.json({ ok: true, phone, message });
+    },
+  );
 
   router.get("/webhooks/subscriptions", async (req: Request, res: Response) => {
     if (!ensureAuthorized(req, res, params.config)) {
       return;
     }
 
-    const subscriptions = await listWebhookSubscriptions(params.config.webhookSubscriptionsFile);
+    const subscriptions = await listWebhookSubscriptions(
+      params.config.webhookSubscriptionsFile,
+    );
     res.json({ ok: true, total: subscriptions.length, subscriptions });
   });
 
-  router.post("/webhooks/subscriptions", async (req: Request, res: Response) => {
-    if (!ensureAuthorized(req, res, params.config)) {
-      return;
-    }
+  router.post(
+    "/webhooks/subscriptions",
+    async (req: Request, res: Response) => {
+      if (!ensureAuthorized(req, res, params.config)) {
+        return;
+      }
 
-    const parsed = webhookSubscriptionSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({
-        ok: false,
-        error: "Invalid request body",
-        issues: parsed.error.flatten().fieldErrors
+      const parsed = webhookSubscriptionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          ok: false,
+          error: "Invalid request body",
+          issues: parsed.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      const subscription = await createWebhookSubscription({
+        filePath: params.config.webhookSubscriptionsFile,
+        url: parsed.data.url,
+        events: parsed.data.events as WebhookEventName[],
+        secret: parsed.data.secret ?? null,
       });
-      return;
-    }
 
-    const subscription = await createWebhookSubscription({
-      filePath: params.config.webhookSubscriptionsFile,
-      url: parsed.data.url,
-      events: parsed.data.events as WebhookEventName[],
-      secret: parsed.data.secret ?? null
-    });
+      res.status(201).json({ ok: true, subscription });
+    },
+  );
 
-    res.status(201).json({ ok: true, subscription });
-  });
+  router.delete(
+    "/webhooks/subscriptions/:id",
+    async (req: Request, res: Response) => {
+      if (!ensureAuthorized(req, res, params.config)) {
+        return;
+      }
 
-  router.delete("/webhooks/subscriptions/:id", async (req: Request, res: Response) => {
-    if (!ensureAuthorized(req, res, params.config)) {
-      return;
-    }
+      const id = req.params.id;
+      if (!id) {
+        res.status(400).json({ ok: false, error: "Missing subscription id" });
+        return;
+      }
 
-    const id = req.params.id;
-    if (!id) {
-      res.status(400).json({ ok: false, error: "Missing subscription id" });
-      return;
-    }
-
-    const deleted = await deleteWebhookSubscription(params.config.webhookSubscriptionsFile, id);
-    res.json({ ok: true, deleted });
-  });
+      const deleted = await deleteWebhookSubscription(
+        params.config.webhookSubscriptionsFile,
+        id,
+      );
+      res.json({ ok: true, deleted });
+    },
+  );
 
   return router;
 }

@@ -347,9 +347,7 @@ Response:
   "total": 2,
   "sent": 2,
   "failed": 0,
-  "results": [
-    { "ok": true, "phone": "529931234567", "messageId": "..." }
-  ]
+  "results": [{ "ok": true, "phone": "529931234567", "messageId": "..." }]
 }
 ```
 

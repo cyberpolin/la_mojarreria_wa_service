@@ -4,7 +4,11 @@ import type { AppConfig } from "../config.js";
 import type { WhatsAppClient } from "../baileys/client.js";
 import { validateServiceRequest } from "../utils/requestAuth.js";
 
-function ensureAuthorized(req: Request, res: Response, config: AppConfig): boolean {
+function ensureAuthorized(
+  req: Request,
+  res: Response,
+  config: AppConfig,
+): boolean {
   const authResult = validateServiceRequest(req, config);
   if (!authResult.ok && !isAuthorizedByQuery(req, config)) {
     res.status(authResult.status).json({ ok: false, error: authResult.error });
@@ -31,8 +35,14 @@ function parseDomain(value: string): string | null {
   }
 }
 
-function isAllowedDomain(domain: string, allowedDomains: readonly string[]): boolean {
-  return allowedDomains.some((allowedDomain) => domain === allowedDomain || domain.endsWith(`.${allowedDomain}`));
+function isAllowedDomain(
+  domain: string,
+  allowedDomains: readonly string[],
+): boolean {
+  return allowedDomains.some(
+    (allowedDomain) =>
+      domain === allowedDomain || domain.endsWith(`.${allowedDomain}`),
+  );
 }
 
 function isAuthorizedByQuery(req: Request, config: AppConfig): boolean {
@@ -44,7 +54,11 @@ function isAuthorizedByQuery(req: Request, config: AppConfig): boolean {
   const clientDomain = getQueryValue(req.query.clientDomain);
   const parsedDomain = clientDomain ? parseDomain(clientDomain) : null;
 
-  return apiKey === config.serviceApiKey && parsedDomain !== null && isAllowedDomain(parsedDomain, config.serviceAllowedDomains);
+  return (
+    apiKey === config.serviceApiKey &&
+    parsedDomain !== null &&
+    isAllowedDomain(parsedDomain, config.serviceAllowedDomains)
+  );
 }
 
 export function createWhatsAppRouter(params: {
@@ -60,7 +74,7 @@ export function createWhatsAppRouter(params: {
 
     res.json({
       ok: true,
-      ...params.whatsAppClient.getStatus()
+      ...params.whatsAppClient.getStatus(),
     });
   });
 
@@ -74,7 +88,7 @@ export function createWhatsAppRouter(params: {
       ? await QRCode.toDataURL(qr, {
           margin: 2,
           width: 320,
-          errorCorrectionLevel: "M"
+          errorCorrectionLevel: "M",
         })
       : null;
 
@@ -82,7 +96,7 @@ export function createWhatsAppRouter(params: {
       ok: true,
       qr,
       qrImage,
-      ...params.whatsAppClient.getStatus()
+      ...params.whatsAppClient.getStatus(),
     });
   });
 
@@ -93,7 +107,7 @@ export function createWhatsAppRouter(params: {
 
     res.status(410).json({
       ok: false,
-      error: "Use /whatsapp/qr for base64 QR data"
+      error: "Use /whatsapp/qr for base64 QR data",
     });
   });
 

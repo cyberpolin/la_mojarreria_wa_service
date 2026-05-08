@@ -6,10 +6,15 @@ import { config as loadDotenv } from "dotenv";
 loadDotenv({ path: resolve(process.cwd(), ".env") });
 
 const confirmed = process.argv.includes("--yes");
-const authDir = resolve(process.cwd(), process.env.WHATSAPP_AUTH_DIR || "./auth");
+const authDir = resolve(
+  process.cwd(),
+  process.env.WHATSAPP_AUTH_DIR || "./auth",
+);
 
 if (!confirmed) {
-  console.error("This deletes the WhatsApp auth/session files and forces a new QR pairing.");
+  console.error(
+    "This deletes the WhatsApp auth/session files and forces a new QR pairing.",
+  );
   console.error("Run again with: pnpm reset:whatsapp -- --yes");
   process.exit(1);
 }

@@ -14,7 +14,11 @@ export function normalizePhone(rawPhone: string): string {
     return `521${digits}`;
   }
 
-  if (digits.startsWith("52") && !digits.startsWith("521") && digits.length === 12) {
+  if (
+    digits.startsWith("52") &&
+    !digits.startsWith("521") &&
+    digits.length === 12
+  ) {
     return `521${digits.slice(2)}`;
   }
 

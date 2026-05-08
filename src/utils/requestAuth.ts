@@ -45,22 +45,37 @@ function getRequestDomain(req: Request): string | null {
   return null;
 }
 
-function isAllowedDomain(domain: string, allowedDomains: readonly string[]): boolean {
-  return allowedDomains.some((allowedDomain) => domain === allowedDomain || domain.endsWith(`.${allowedDomain}`));
+function isAllowedDomain(
+  domain: string,
+  allowedDomains: readonly string[],
+): boolean {
+  return allowedDomains.some(
+    (allowedDomain) =>
+      domain === allowedDomain || domain.endsWith(`.${allowedDomain}`),
+  );
 }
 
-export function isAllowedRequestDomain(domain: string, allowedDomains: readonly string[]): boolean {
+export function isAllowedRequestDomain(
+  domain: string,
+  allowedDomains: readonly string[],
+): boolean {
   return isAllowedDomain(domain, allowedDomains);
 }
 
-export function validateServiceRequest(req: Request, config: AppConfig): RequestAuthResult {
+export function validateServiceRequest(
+  req: Request,
+  config: AppConfig,
+): RequestAuthResult {
   const apiKey = req.header("x-api-key");
   if (apiKey !== config.serviceApiKey) {
     return { ok: false, status: 401, error: "Unauthorized" };
   }
 
   const requestDomain = getRequestDomain(req);
-  if (!requestDomain || !isAllowedDomain(requestDomain, config.serviceAllowedDomains)) {
+  if (
+    !requestDomain ||
+    !isAllowedDomain(requestDomain, config.serviceAllowedDomains)
+  ) {
     return { ok: false, status: 403, error: "Forbidden domain" };
   }
 

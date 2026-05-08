@@ -39,7 +39,12 @@ async function readData(filePath: string): Promise<ConversationData> {
 
     return { messages: parsed.messages };
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
       return emptyData();
     }
 
@@ -47,7 +52,10 @@ async function readData(filePath: string): Promise<ConversationData> {
   }
 }
 
-async function writeData(filePath: string, data: ConversationData): Promise<void> {
+async function writeData(
+  filePath: string,
+  data: ConversationData,
+): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
@@ -56,7 +64,7 @@ function enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
   const next = writeQueue.then(operation, operation);
   writeQueue = next.then(
     () => undefined,
-    () => undefined
+    () => undefined,
   );
 
   return next;
@@ -77,7 +85,7 @@ export async function recordConversationMessage(params: {
       phone: params.phone,
       text: params.text,
       direction: params.direction,
-      timestamp: params.timestamp
+      timestamp: params.timestamp,
     };
 
     data.messages.push(message);
@@ -86,7 +94,10 @@ export async function recordConversationMessage(params: {
   });
 }
 
-export async function listConversations(filePath: string, limit = 50): Promise<Conversation[]> {
+export async function listConversations(
+  filePath: string,
+  limit = 50,
+): Promise<Conversation[]> {
   const data = await readData(filePath);
   const byPhone = new Map<string, Conversation>();
 
@@ -97,7 +108,7 @@ export async function listConversations(filePath: string, limit = 50): Promise<C
         phone: message.phone,
         lastMessage: message,
         messageCount: 1,
-        updatedAt: message.timestamp
+        updatedAt: message.timestamp,
       });
       continue;
     }
@@ -133,7 +144,7 @@ export async function getLastConversationMessage(params: {
   const [lastMessage] = await listConversationMessages({
     filePath: params.filePath,
     phone: params.phone,
-    limit: 1
+    limit: 1,
   });
 
   return lastMessage ?? null;

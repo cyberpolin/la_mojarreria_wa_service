@@ -3,7 +3,11 @@ import pino from "pino";
 export const logger = pino({
   level: process.env.LOG_LEVEL ?? "info",
   redact: {
-    paths: ["req.headers.authorization", "req.headers.x-api-key", "webhookSecret"],
-    remove: true
-  }
+    paths: [
+      "req.headers.authorization",
+      "req.headers.x-api-key",
+      "webhookSecret",
+    ],
+    remove: true,
+  },
 });

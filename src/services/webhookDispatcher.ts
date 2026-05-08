@@ -1,6 +1,9 @@
 import type { Logger } from "pino";
 import type { ConversationMessage } from "./conversationStore.js";
-import { listWebhookSubscriptions, type WebhookEventName } from "./webhookSubscriptionStore.js";
+import {
+  listWebhookSubscriptions,
+  type WebhookEventName,
+} from "./webhookSubscriptionStore.js";
 
 type WebhookPayload = {
   event: WebhookEventName;
@@ -16,7 +19,8 @@ export async function dispatchWebhookEvent(params: {
 }): Promise<void> {
   const subscriptions = await listWebhookSubscriptions(params.filePath);
   const targets = subscriptions.filter(
-    (subscription) => subscription.active && subscription.events.includes(params.event)
+    (subscription) =>
+      subscription.active && subscription.events.includes(params.event),
   );
 
   await Promise.all(
@@ -24,7 +28,7 @@ export async function dispatchWebhookEvent(params: {
       try {
         const headers: Record<string, string> = {
           "content-type": "application/json",
-          "x-wa-service-event": params.event
+          "x-wa-service-event": params.event,
         };
 
         if (subscription.secret) {
@@ -34,7 +38,7 @@ export async function dispatchWebhookEvent(params: {
         const response = await fetch(subscription.url, {
           method: "POST",
           headers,
-          body: JSON.stringify(params.payload)
+          body: JSON.stringify(params.payload),
         });
 
         if (!response.ok) {
@@ -42,9 +46,9 @@ export async function dispatchWebhookEvent(params: {
             {
               status: response.status,
               subscriptionId: subscription.id,
-              url: subscription.url
+              url: subscription.url,
             },
-            "v1 webhook subscription request failed"
+            "v1 webhook subscription request failed",
           );
         }
       } catch (error) {
@@ -52,11 +56,11 @@ export async function dispatchWebhookEvent(params: {
           {
             err: error,
             subscriptionId: subscription.id,
-            url: subscription.url
+            url: subscription.url,
           },
-          "v1 webhook subscription request failed"
+          "v1 webhook subscription request failed",
         );
       }
-    })
+    }),
   );
 }

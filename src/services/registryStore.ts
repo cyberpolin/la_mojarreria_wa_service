@@ -34,7 +34,12 @@ async function readData(filePath: string): Promise<RegistryData> {
 
     return { registrations: parsed.registrations };
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
       return emptyData();
     }
 
@@ -51,7 +56,7 @@ function enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
   const next = writeQueue.then(operation, operation);
   writeQueue = next.then(
     () => undefined,
-    () => undefined
+    () => undefined,
   );
 
   return next;
@@ -67,7 +72,9 @@ export async function upsertPendingRegistry(params: {
   return enqueueWrite(async () => {
     const now = new Date().toISOString();
     const data = await readData(params.filePath);
-    const existing = data.registrations.find((record) => record.phone === params.phone);
+    const existing = data.registrations.find(
+      (record) => record.phone === params.phone,
+    );
     const status = params.status ?? existing?.status ?? "pending";
 
     const nextRecord: RegistryRecord = {
@@ -77,7 +84,10 @@ export async function upsertPendingRegistry(params: {
       status,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
-      activatedAt: status === "active" ? (existing?.activatedAt ?? now) : (existing?.activatedAt ?? null)
+      activatedAt:
+        status === "active"
+          ? (existing?.activatedAt ?? now)
+          : (existing?.activatedAt ?? null),
     };
 
     if (existing) {
@@ -91,12 +101,17 @@ export async function upsertPendingRegistry(params: {
   });
 }
 
-export async function getRegistryRecord(filePath: string, phone: string): Promise<RegistryRecord | null> {
+export async function getRegistryRecord(
+  filePath: string,
+  phone: string,
+): Promise<RegistryRecord | null> {
   const data = await readData(filePath);
   return data.registrations.find((record) => record.phone === phone) ?? null;
 }
 
-export async function listRegistryRecords(filePath: string): Promise<RegistryRecord[]> {
+export async function listRegistryRecords(
+  filePath: string,
+): Promise<RegistryRecord[]> {
   const data = await readData(filePath);
   return data.registrations;
 }
@@ -109,7 +124,9 @@ export async function activateRegistry(params: {
   return enqueueWrite(async () => {
     const now = new Date().toISOString();
     const data = await readData(params.filePath);
-    const existing = data.registrations.find((record) => record.phone === params.phone);
+    const existing = data.registrations.find(
+      (record) => record.phone === params.phone,
+    );
 
     if (!existing) {
       return null;
@@ -122,7 +139,7 @@ export async function activateRegistry(params: {
       status: "active",
       createdAt: existing.createdAt,
       updatedAt: now,
-      activatedAt: now
+      activatedAt: now,
     };
 
     Object.assign(existing, nextRecord);

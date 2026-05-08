@@ -5,7 +5,11 @@ import type { AppConfig } from "../config.js";
 import { rememberCampaign } from "../services/campaignStore.js";
 import { savePendingToDummyRegistry } from "../services/dummyRegistryApi.js";
 import { listRecentInboundContacts } from "../services/inboundContactStore.js";
-import { getRegistryRecord, listRegistryRecords, upsertPendingRegistry } from "../services/registryStore.js";
+import {
+  getRegistryRecord,
+  listRegistryRecords,
+  upsertPendingRegistry,
+} from "../services/registryStore.js";
 import { normalizePhone } from "../utils/phone.js";
 import { validateServiceRequest } from "../utils/requestAuth.js";
 import type { WhatsAppClient } from "../baileys/client.js";
@@ -14,7 +18,12 @@ const initialRegistryStatusSchema = z
   .enum(["pending", "active", "activated", "activo", "activado", "pendiente"])
   .default("pending")
   .transform((status) => {
-    if (status === "active" || status === "activated" || status === "activo" || status === "activado") {
+    if (
+      status === "active" ||
+      status === "activated" ||
+      status === "activo" ||
+      status === "activado"
+    ) {
       return "active" as const;
     }
 
@@ -25,20 +34,20 @@ const subscriptionMessageSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(10).max(20),
   campaignKey: z.string().trim().min(1).max(120),
-  status: initialRegistryStatusSchema
+  status: initialRegistryStatusSchema,
 });
 
 const broadcastMessageSchema = z.object({
   text: z.string().trim().min(1).max(1000),
-  status: z.enum(["pending", "active", "all"]).default("active")
+  status: z.enum(["pending", "active", "all"]).default("active"),
 });
 
 const listRegistrationsQuerySchema = z.object({
-  status: z.enum(["pending", "active", "all"]).default("all")
+  status: z.enum(["pending", "active", "all"]).default("all"),
 });
 
 const recentInboundQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(50).default(50)
+  limit: z.coerce.number().int().positive().max(50).default(50),
 });
 
 export function createMessagesRouter(params: {
@@ -51,7 +60,9 @@ export function createMessagesRouter(params: {
   router.get("/registrations", async (req: Request, res: Response) => {
     const authResult = validateServiceRequest(req, params.config);
     if (!authResult.ok) {
-      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      res
+        .status(authResult.status)
+        .json({ ok: false, error: authResult.error });
       return;
     }
 
@@ -60,15 +71,18 @@ export function createMessagesRouter(params: {
       res.status(400).json({
         ok: false,
         error: "Invalid query",
-        issues: parsed.error.flatten().fieldErrors
+        issues: parsed.error.flatten().fieldErrors,
       });
       return;
     }
 
     try {
-      const records = await listRegistryRecords(params.config.registryStoreFile);
+      const records = await listRegistryRecords(
+        params.config.registryStoreFile,
+      );
       const filteredRecords = records.filter(
-        (record) => parsed.data.status === "all" || record.status === parsed.data.status
+        (record) =>
+          parsed.data.status === "all" || record.status === parsed.data.status,
       );
 
       res.json({
@@ -81,59 +95,81 @@ export function createMessagesRouter(params: {
           status: record.status,
           createdAt: record.createdAt,
           updatedAt: record.updatedAt,
-          activatedAt: record.activatedAt
-        }))
+          activatedAt: record.activatedAt,
+        })),
       });
     } catch (error) {
       params.logger.error({ err: error }, "failed to list registered phones");
-      res.status(502).json({ ok: false, error: "Failed to list registrations" });
+      res
+        .status(502)
+        .json({ ok: false, error: "Failed to list registrations" });
     }
   });
 
-  router.get("/registrations/:phone/status", async (req: Request, res: Response) => {
-    const authResult = validateServiceRequest(req, params.config);
-    if (!authResult.ok) {
-      res.status(authResult.status).json({ ok: false, error: authResult.error });
-      return;
-    }
-
-    let phone: string;
-    try {
-      phone = normalizePhone(req.params.phone ?? "");
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid phone" });
-      return;
-    }
-
-    try {
-      const record = await getRegistryRecord(params.config.registryStoreFile, phone);
-      if (!record) {
-        res.status(404).json({
-          ok: false,
-          phone,
-          campaignKey: null,
-          status: null,
-          error: "Registration not found"
-        });
+  router.get(
+    "/registrations/:phone/status",
+    async (req: Request, res: Response) => {
+      const authResult = validateServiceRequest(req, params.config);
+      if (!authResult.ok) {
+        res
+          .status(authResult.status)
+          .json({ ok: false, error: authResult.error });
         return;
       }
 
-      res.json({
-        ok: true,
-        phone,
-        campaignKey: record.campaignKey,
-        status: record.status
-      });
-    } catch (error) {
-      params.logger.error({ err: error, phone }, "failed to get registration status");
-      res.status(502).json({ ok: false, error: "Failed to get registration status" });
-    }
-  });
+      let phone: string;
+      try {
+        phone = normalizePhone(req.params.phone ?? "");
+      } catch (error) {
+        res
+          .status(400)
+          .json({
+            ok: false,
+            error: error instanceof Error ? error.message : "Invalid phone",
+          });
+        return;
+      }
+
+      try {
+        const record = await getRegistryRecord(
+          params.config.registryStoreFile,
+          phone,
+        );
+        if (!record) {
+          res.status(404).json({
+            ok: false,
+            phone,
+            campaignKey: null,
+            status: null,
+            error: "Registration not found",
+          });
+          return;
+        }
+
+        res.json({
+          ok: true,
+          phone,
+          campaignKey: record.campaignKey,
+          status: record.status,
+        });
+      } catch (error) {
+        params.logger.error(
+          { err: error, phone },
+          "failed to get registration status",
+        );
+        res
+          .status(502)
+          .json({ ok: false, error: "Failed to get registration status" });
+      }
+    },
+  );
 
   router.get("/inbound/recent", async (req: Request, res: Response) => {
     const authResult = validateServiceRequest(req, params.config);
     if (!authResult.ok) {
-      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      res
+        .status(authResult.status)
+        .json({ ok: false, error: authResult.error });
       return;
     }
 
@@ -142,71 +178,102 @@ export function createMessagesRouter(params: {
       res.status(400).json({
         ok: false,
         error: "Invalid query",
-        issues: parsed.error.flatten().fieldErrors
+        issues: parsed.error.flatten().fieldErrors,
       });
       return;
     }
 
     try {
-      const contacts = await listRecentInboundContacts(params.config.inboundContactsStoreFile, parsed.data.limit);
+      const contacts = await listRecentInboundContacts(
+        params.config.inboundContactsStoreFile,
+        parsed.data.limit,
+      );
       res.json({
         ok: true,
         total: contacts.length,
-        contacts
+        contacts,
       });
     } catch (error) {
-      params.logger.error({ err: error }, "failed to list recent inbound WhatsApp contacts");
-      res.status(502).json({ ok: false, error: "Failed to list recent inbound contacts" });
+      params.logger.error(
+        { err: error },
+        "failed to list recent inbound WhatsApp contacts",
+      );
+      res
+        .status(502)
+        .json({ ok: false, error: "Failed to list recent inbound contacts" });
     }
   });
 
-  router.get("/inbound/recent-active-promos", async (req: Request, res: Response) => {
-    const authResult = validateServiceRequest(req, params.config);
-    if (!authResult.ok) {
-      res.status(authResult.status).json({ ok: false, error: authResult.error });
-      return;
-    }
+  router.get(
+    "/inbound/recent-active-promos",
+    async (req: Request, res: Response) => {
+      const authResult = validateServiceRequest(req, params.config);
+      if (!authResult.ok) {
+        res
+          .status(authResult.status)
+          .json({ ok: false, error: authResult.error });
+        return;
+      }
 
-    const parsed = recentInboundQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({
-        ok: false,
-        error: "Invalid query",
-        issues: parsed.error.flatten().fieldErrors
-      });
-      return;
-    }
+      const parsed = recentInboundQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({
+          ok: false,
+          error: "Invalid query",
+          issues: parsed.error.flatten().fieldErrors,
+        });
+        return;
+      }
 
-    try {
-      const contacts = await listRecentInboundContacts(params.config.inboundContactsStoreFile, parsed.data.limit);
-      const activeRegistrations = (await listRegistryRecords(params.config.registryStoreFile)).filter(
-        (registration) => registration.status === "active"
-      );
-      const activeRegistrationByPhone = new Map(
-        activeRegistrations.map((registration) => [registration.phone, registration])
-      );
-      const matches = contacts
-        .map((contact) => {
-          const registration = activeRegistrationByPhone.get(contact.phone);
-          return registration ? { ...contact, registration } : null;
-        })
-        .filter((match): match is NonNullable<typeof match> => match !== null);
+      try {
+        const contacts = await listRecentInboundContacts(
+          params.config.inboundContactsStoreFile,
+          parsed.data.limit,
+        );
+        const activeRegistrations = (
+          await listRegistryRecords(params.config.registryStoreFile)
+        ).filter((registration) => registration.status === "active");
+        const activeRegistrationByPhone = new Map(
+          activeRegistrations.map((registration) => [
+            registration.phone,
+            registration,
+          ]),
+        );
+        const matches = contacts
+          .map((contact) => {
+            const registration = activeRegistrationByPhone.get(contact.phone);
+            return registration ? { ...contact, registration } : null;
+          })
+          .filter(
+            (match): match is NonNullable<typeof match> => match !== null,
+          );
 
-      res.json({
-        ok: true,
-        total: matches.length,
-        contacts: matches
-      });
-    } catch (error) {
-      params.logger.error({ err: error }, "failed to list recent inbound WhatsApp contacts with active promos");
-      res.status(502).json({ ok: false, error: "Failed to list recent inbound contacts with active promos" });
-    }
-  });
+        res.json({
+          ok: true,
+          total: matches.length,
+          contacts: matches,
+        });
+      } catch (error) {
+        params.logger.error(
+          { err: error },
+          "failed to list recent inbound WhatsApp contacts with active promos",
+        );
+        res
+          .status(502)
+          .json({
+            ok: false,
+            error: "Failed to list recent inbound contacts with active promos",
+          });
+      }
+    },
+  );
 
   router.post("/subscription", async (req: Request, res: Response) => {
     const authResult = validateServiceRequest(req, params.config);
     if (!authResult.ok) {
-      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      res
+        .status(authResult.status)
+        .json({ ok: false, error: authResult.error });
       return;
     }
 
@@ -215,7 +282,7 @@ export function createMessagesRouter(params: {
       res.status(400).json({
         ok: false,
         error: "Invalid request body",
-        issues: parsed.error.flatten().fieldErrors
+        issues: parsed.error.flatten().fieldErrors,
       });
       return;
     }
@@ -224,28 +291,37 @@ export function createMessagesRouter(params: {
     try {
       phone = normalizePhone(parsed.data.phone);
     } catch (error) {
-      res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Invalid phone" });
+      res
+        .status(400)
+        .json({
+          ok: false,
+          error: error instanceof Error ? error.message : "Invalid phone",
+        });
       return;
     }
 
     try {
-      const existingRegistry = await getRegistryRecord(params.config.registryStoreFile, phone);
+      const existingRegistry = await getRegistryRecord(
+        params.config.registryStoreFile,
+        phone,
+      );
       if (existingRegistry) {
-        const messageId = await params.whatsAppClient.sendAlreadyRegisteredMessage({ phone });
+        const messageId =
+          await params.whatsAppClient.sendAlreadyRegisteredMessage({ phone });
 
         res.json({
           ok: true,
           phone,
           campaignKey: existingRegistry.campaignKey,
           messageId,
-          alreadyRegistered: true
+          alreadyRegistered: true,
         });
         return;
       }
 
       const messageId = await params.whatsAppClient.sendSubscriptionMessage({
         name: parsed.data.name,
-        phone
+        phone,
       });
 
       rememberCampaign(phone, parsed.data.campaignKey);
@@ -254,12 +330,12 @@ export function createMessagesRouter(params: {
         phone,
         name: parsed.data.name,
         campaignKey: parsed.data.campaignKey,
-        status: parsed.data.status
+        status: parsed.data.status,
       });
       await savePendingToDummyRegistry({
         baseUrl: params.config.dummyRegistryApiUrl,
         logger: params.logger,
-        record: registryRecord
+        record: registryRecord,
       });
 
       res.json({
@@ -267,18 +343,25 @@ export function createMessagesRouter(params: {
         phone,
         campaignKey: parsed.data.campaignKey,
         messageId,
-        status: registryRecord.status
+        status: registryRecord.status,
       });
     } catch (error) {
-      params.logger.error({ err: error, phone }, "failed to send subscription WhatsApp message");
-      res.status(502).json({ ok: false, error: "Failed to send WhatsApp message" });
+      params.logger.error(
+        { err: error, phone },
+        "failed to send subscription WhatsApp message",
+      );
+      res
+        .status(502)
+        .json({ ok: false, error: "Failed to send WhatsApp message" });
     }
   });
 
   router.post("/broadcast", async (req: Request, res: Response) => {
     const authResult = validateServiceRequest(req, params.config);
     if (!authResult.ok) {
-      res.status(authResult.status).json({ ok: false, error: authResult.error });
+      res
+        .status(authResult.status)
+        .json({ ok: false, error: authResult.error });
       return;
     }
 
@@ -287,26 +370,38 @@ export function createMessagesRouter(params: {
       res.status(400).json({
         ok: false,
         error: "Invalid request body",
-        issues: parsed.error.flatten().fieldErrors
+        issues: parsed.error.flatten().fieldErrors,
       });
       return;
     }
 
     try {
-      const records = await listRegistryRecords(params.config.registryStoreFile);
-      const targetRecords = records.filter((record) => parsed.data.status === "all" || record.status === parsed.data.status);
+      const records = await listRegistryRecords(
+        params.config.registryStoreFile,
+      );
+      const targetRecords = records.filter(
+        (record) =>
+          parsed.data.status === "all" || record.status === parsed.data.status,
+      );
       const results = [];
 
       for (const record of targetRecords) {
         try {
           const messageId = await params.whatsAppClient.sendTextMessage({
             phone: record.phone,
-            text: parsed.data.text
+            text: parsed.data.text,
           });
           results.push({ ok: true, phone: record.phone, messageId });
         } catch (error) {
-          params.logger.warn({ err: error, phone: record.phone }, "failed to send broadcast WhatsApp message");
-          results.push({ ok: false, phone: record.phone, error: "Failed to send WhatsApp message" });
+          params.logger.warn(
+            { err: error, phone: record.phone },
+            "failed to send broadcast WhatsApp message",
+          );
+          results.push({
+            ok: false,
+            phone: record.phone,
+            error: "Failed to send WhatsApp message",
+          });
         }
       }
 
@@ -318,10 +413,13 @@ export function createMessagesRouter(params: {
         total: results.length,
         sent,
         failed,
-        results
+        results,
       });
     } catch (error) {
-      params.logger.error({ err: error }, "failed to send broadcast WhatsApp messages");
+      params.logger.error(
+        { err: error },
+        "failed to send broadcast WhatsApp messages",
+      );
       res.status(502).json({ ok: false, error: "Failed to send broadcast" });
     }
   });

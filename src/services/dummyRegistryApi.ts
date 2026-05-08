@@ -17,7 +17,7 @@ async function sendDummyRegistryRequest(params: {
     const response = await fetch(url, {
       method: params.method,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: params.record.phone, ...params.record })
+      body: JSON.stringify({ id: params.record.phone, ...params.record }),
     });
 
     if (!response.ok) {
@@ -26,9 +26,9 @@ async function sendDummyRegistryRequest(params: {
         {
           status: response.status,
           responseText,
-          phone: params.record.phone
+          phone: params.record.phone,
         },
-        "dummy registry API request failed"
+        "dummy registry API request failed",
       );
     }
   } catch (error) {
@@ -36,9 +36,9 @@ async function sendDummyRegistryRequest(params: {
       {
         err: error,
         phone: params.record.phone,
-        url
+        url,
       },
-      "dummy registry API request failed"
+      "dummy registry API request failed",
     );
   }
 }
@@ -53,7 +53,7 @@ export async function savePendingToDummyRegistry(params: {
     logger: params.logger,
     method: "PUT",
     path: `/registrations/${encodeURIComponent(params.record.phone)}`,
-    record: params.record
+    record: params.record,
   });
 }
 
@@ -67,6 +67,6 @@ export async function activateDummyRegistry(params: {
     logger: params.logger,
     method: "PUT",
     path: `/registrations/${encodeURIComponent(params.record.phone)}`,
-    record: params.record
+    record: params.record,
   });
 }
