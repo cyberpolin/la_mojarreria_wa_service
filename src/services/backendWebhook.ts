@@ -10,6 +10,13 @@ export type SubscriptionReplyWebhookPayload = {
   campaignKey: string | null;
 };
 
+export type PromotionUsedWebhookPayload = {
+  phone: string;
+  campaignKey: string | null;
+  timestamp: string;
+  source: "wa-service";
+};
+
 export async function notifySubscriptionReply(
   config: AppConfig,
   logger: Logger,
@@ -44,4 +51,46 @@ export async function notifySubscriptionReply(
     );
     throw new Error(`Backend webhook failed with status ${response.status}`);
   }
+}
+
+export async function notifyPromotionUsed(
+  config: AppConfig,
+  logger: Logger,
+  payload: PromotionUsedWebhookPayload,
+): Promise<unknown> {
+  const url = `${config.mainBackendUrl}/webhooks/whatsapp/promotion-used`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-webhook-secret": config.mainBackendWebhookSecret,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseText = await response.text().catch(() => "");
+  let responseBody: unknown = null;
+  if (responseText) {
+    try {
+      responseBody = JSON.parse(responseText);
+    } catch {
+      responseBody = responseText;
+    }
+  }
+
+  if (!response.ok) {
+    logger.error(
+      {
+        status: response.status,
+        statusText: response.statusText,
+        responseBody,
+        phone: payload.phone,
+      },
+      "main backend rejected promotion used webhook",
+    );
+    throw new Error(`Backend promotion used webhook failed with status ${response.status}`);
+  }
+
+  return responseBody;
 }

@@ -225,6 +225,36 @@ Response:
 }
 ```
 
+### `POST /messages/registrations/:phone/use`
+
+Notifies the main backend that a promotion was used. The phone is normalized before sending, so `529931175435` becomes `5219931175435`. This service does not mark the promotion as used locally; the main backend owns that business state.
+
+Headers:
+
+```http
+x-api-key: SERVICE_API_KEY
+x-client-domain: lamojarreria.com
+```
+
+```bash
+curl -X POST "https://api.wa.lamojarreria.com/messages/registrations/529931175435/use" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com"
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "phone": "5219931175435",
+  "campaignKey": "free_papas_signup",
+  "backend": {
+    "ok": true
+  }
+}
+```
+
 ### `GET /messages/inbound/recent`
 
 Lists the latest phone numbers that wrote to WhatsApp, ordered by last inbound message.

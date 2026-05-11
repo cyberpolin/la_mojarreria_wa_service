@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import { rememberCampaign } from "../services/campaignStore.js";
+import { notifyPromotionUsed } from "../services/backendWebhook.js";
 import { savePendingToDummyRegistry } from "../services/dummyRegistryApi.js";
 import { listRecentInboundContacts } from "../services/inboundContactStore.js";
 import {
@@ -160,6 +161,62 @@ export function createMessagesRouter(params: {
         res
           .status(502)
           .json({ ok: false, error: "Failed to get registration status" });
+      }
+    },
+  );
+
+  router.post(
+    "/registrations/:phone/use",
+    async (req: Request, res: Response) => {
+      const authResult = validateServiceRequest(req, params.config);
+      if (!authResult.ok) {
+        res
+          .status(authResult.status)
+          .json({ ok: false, error: authResult.error });
+        return;
+      }
+
+      let phone: string;
+      try {
+        phone = normalizePhone(req.params.phone ?? "");
+      } catch (error) {
+        res.status(400).json({
+          ok: false,
+          error: error instanceof Error ? error.message : "Invalid phone",
+        });
+        return;
+      }
+
+      try {
+        const existingRecord = await getRegistryRecord(
+          params.config.registryStoreFile,
+          phone,
+        );
+        const backendResponse = await notifyPromotionUsed(
+          params.config,
+          params.logger,
+          {
+            phone,
+            campaignKey: existingRecord?.campaignKey ?? null,
+            timestamp: new Date().toISOString(),
+            source: "wa-service",
+          },
+        );
+
+        res.json({
+          ok: true,
+          phone,
+          campaignKey: existingRecord?.campaignKey ?? null,
+          backend: backendResponse,
+        });
+      } catch (error) {
+        params.logger.error(
+          { err: error, phone },
+          "failed to mark registration as used",
+        );
+        res
+          .status(502)
+          .json({ ok: false, error: "Failed to mark registration as used" });
       }
     },
   );
