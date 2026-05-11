@@ -3,12 +3,12 @@ import type { Logger } from "pino";
 import { z } from "zod";
 import type { AppConfig } from "../config.js";
 import { rememberCampaign } from "../services/campaignStore.js";
-import { notifyPromotionUsed } from "../services/backendWebhook.js";
 import { savePendingToDummyRegistry } from "../services/dummyRegistryApi.js";
 import { listRecentInboundContacts } from "../services/inboundContactStore.js";
 import {
   getRegistryRecord,
   listRegistryRecords,
+  markRegistryUsed,
   upsertPendingRegistry,
 } from "../services/registryStore.js";
 import { normalizePhone } from "../utils/phone.js";
@@ -40,11 +40,11 @@ const subscriptionMessageSchema = z.object({
 
 const broadcastMessageSchema = z.object({
   text: z.string().trim().min(1).max(1000),
-  status: z.enum(["pending", "active", "all"]).default("active"),
+  status: z.enum(["pending", "active", "used", "all"]).default("active"),
 });
 
 const listRegistrationsQuerySchema = z.object({
-  status: z.enum(["pending", "active", "all"]).default("all"),
+  status: z.enum(["pending", "active", "used", "all"]).default("all"),
 });
 
 const recentInboundQuerySchema = z.object({
@@ -97,6 +97,7 @@ export function createMessagesRouter(params: {
           createdAt: record.createdAt,
           updatedAt: record.updatedAt,
           activatedAt: record.activatedAt,
+          usedAt: record.usedAt ?? null,
         })),
       });
     } catch (error) {
@@ -152,6 +153,7 @@ export function createMessagesRouter(params: {
           phone,
           campaignKey: record.campaignKey,
           status: record.status,
+          usedAt: record.usedAt ?? null,
         });
       } catch (error) {
         params.logger.error(
@@ -188,26 +190,28 @@ export function createMessagesRouter(params: {
       }
 
       try {
-        const existingRecord = await getRegistryRecord(
-          params.config.registryStoreFile,
+        const record = await markRegistryUsed({
+          filePath: params.config.registryStoreFile,
           phone,
-        );
-        const backendResponse = await notifyPromotionUsed(
-          params.config,
-          params.logger,
-          {
+        });
+
+        if (!record) {
+          res.status(404).json({
+            ok: false,
             phone,
-            campaignKey: existingRecord?.campaignKey ?? null,
-            timestamp: new Date().toISOString(),
-            source: "wa-service",
-          },
-        );
+            campaignKey: null,
+            status: null,
+            error: "Registration not found",
+          });
+          return;
+        }
 
         res.json({
           ok: true,
           phone,
-          campaignKey: existingRecord?.campaignKey ?? null,
-          backend: backendResponse,
+          campaignKey: record.campaignKey,
+          status: record.status,
+          usedAt: record.usedAt,
         });
       } catch (error) {
         params.logger.error(

@@ -175,7 +175,7 @@ curl "https://api.wa.lamojarreria.com/messages/registrations?status=all" \
   -H "x-client-domain: lamojarreria.com"
 ```
 
-`status` defaults to `all`. Use `pending`, `active`, or `all`.
+`status` defaults to `all`. Use `pending`, `active`, `used`, or `all`.
 
 Response:
 
@@ -191,7 +191,8 @@ Response:
       "status": "active",
       "createdAt": "2026-05-06T00:00:00.000Z",
       "updatedAt": "2026-05-06T00:05:00.000Z",
-      "activatedAt": "2026-05-06T00:05:00.000Z"
+      "activatedAt": "2026-05-06T00:05:00.000Z",
+      "usedAt": null
     }
   ]
 }
@@ -227,7 +228,7 @@ Response:
 
 ### `POST /messages/registrations/:phone/use`
 
-Notifies the main backend that a promotion was used. The phone is normalized before sending, so `529931175435` becomes `5219931175435`. This service does not mark the promotion as used locally; the main backend owns that business state.
+Marks one registration promotion as used in the local JSON registry. The phone is normalized before lookup, so `529931175435` becomes `5219931175435`.
 
 Headers:
 
@@ -249,9 +250,8 @@ Response:
   "ok": true,
   "phone": "5219931175435",
   "campaignKey": "free_papas_signup",
-  "backend": {
-    "ok": true
-  }
+  "status": "used",
+  "usedAt": "2026-05-11T00:00:00.000Z"
 }
 ```
 
@@ -356,7 +356,7 @@ Body:
 }
 ```
 
-`status` defaults to `active`. Use `pending`, `active`, or `all`.
+`status` defaults to `active`. Use `pending`, `active`, `used`, or `all`.
 
 ```bash
 curl -X POST https://api.wa.lamojarreria.com/messages/broadcast \

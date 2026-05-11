@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export type RegistryStatus = "pending" | "active";
+export type RegistryStatus = "pending" | "active" | "used";
 
 export type RegistryRecord = {
   phone: string;
@@ -11,6 +11,7 @@ export type RegistryRecord = {
   createdAt: string;
   updatedAt: string;
   activatedAt: string | null;
+  usedAt: string | null;
 };
 
 type RegistryData = {
@@ -88,6 +89,7 @@ export async function upsertPendingRegistry(params: {
         status === "active"
           ? (existing?.activatedAt ?? now)
           : (existing?.activatedAt ?? null),
+      usedAt: existing?.usedAt ?? null,
     };
 
     if (existing) {
@@ -140,6 +142,39 @@ export async function activateRegistry(params: {
       createdAt: existing.createdAt,
       updatedAt: now,
       activatedAt: now,
+      usedAt: existing.usedAt ?? null,
+    };
+
+    Object.assign(existing, nextRecord);
+    await writeData(params.filePath, data);
+    return nextRecord;
+  });
+}
+
+export async function markRegistryUsed(params: {
+  filePath: string;
+  phone: string;
+}): Promise<RegistryRecord | null> {
+  return enqueueWrite(async () => {
+    const now = new Date().toISOString();
+    const data = await readData(params.filePath);
+    const existing = data.registrations.find(
+      (record) => record.phone === params.phone,
+    );
+
+    if (!existing) {
+      return null;
+    }
+
+    const nextRecord: RegistryRecord = {
+      phone: params.phone,
+      name: existing.name,
+      campaignKey: existing.campaignKey,
+      status: "used",
+      createdAt: existing.createdAt,
+      updatedAt: now,
+      activatedAt: existing.activatedAt,
+      usedAt: existing.usedAt ?? now,
     };
 
     Object.assign(existing, nextRecord);
