@@ -17,6 +17,18 @@ export type PromotionUsedWebhookPayload = {
   source: "wa-service";
 };
 
+export type WaServiceStatusWebhookPayload = {
+  service: "wa-service";
+  instanceId: string;
+  active: boolean;
+  connected: boolean;
+  connection: "connecting" | "open" | "close";
+  hasQr: boolean;
+  state: "INACTIVE" | "STARTING" | "ACTIVE" | "STOPPING" | "ERROR";
+  reason: string;
+  changedAt: string;
+};
+
 export async function notifySubscriptionReply(
   config: AppConfig,
   logger: Logger,
@@ -89,8 +101,43 @@ export async function notifyPromotionUsed(
       },
       "main backend rejected promotion used webhook",
     );
-    throw new Error(`Backend promotion used webhook failed with status ${response.status}`);
+    throw new Error(
+      `Backend promotion used webhook failed with status ${response.status}`,
+    );
   }
 
   return responseBody;
+}
+
+export async function notifyWaServiceStatusChanged(
+  config: AppConfig,
+  logger: Logger,
+  payload: WaServiceStatusWebhookPayload,
+): Promise<void> {
+  const url = `${config.mainBackendUrl}/rest/wa-service/status`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-wa-service-webhook-secret": config.mainBackendWebhookSecret,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => "");
+    logger.error(
+      {
+        status: response.status,
+        statusText: response.statusText,
+        responseText,
+        payload,
+      },
+      "main backend rejected WhatsApp service status webhook",
+    );
+    throw new Error(
+      `Backend WhatsApp service status webhook failed with status ${response.status}`,
+    );
+  }
 }

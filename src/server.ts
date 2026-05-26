@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import type { AppConfig } from "./config.js";
 import type { WhatsAppClient } from "./baileys/client.js";
 import { createMessagesRouter } from "./routes/messages.js";
+import { createServiceRouter } from "./routes/service.js";
 import { createV1Router } from "./routes/v1.js";
 import { createWhatsAppRouter } from "./routes/whatsapp.js";
 import {
@@ -76,6 +77,14 @@ export function createServer(params: {
     createMessagesRouter({
       config: params.config,
       logger: params.logger,
+      whatsAppClient: params.whatsAppClient,
+    }),
+  );
+
+  app.use(
+    "/service",
+    createServiceRouter({
+      config: params.config,
       whatsAppClient: params.whatsAppClient,
     }),
   );

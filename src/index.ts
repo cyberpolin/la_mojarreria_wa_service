@@ -2,10 +2,31 @@ import { createServer } from "./server.js";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { WhatsAppClient } from "./baileys/client.js";
+import { notifyWaServiceStatusChanged } from "./services/backendWebhook.js";
 
 const whatsAppClient = new WhatsAppClient(config, logger);
+whatsAppClient.setStatusChangeHandler((status, reason) =>
+  notifyWaServiceStatusChanged(config, logger, {
+    service: "wa-service",
+    instanceId: "default",
+    active: status.active,
+    connected: status.connected,
+    connection: status.connection,
+    hasQr: status.hasQr,
+    state: status.state,
+    reason,
+    changedAt: status.lastChangedAt,
+  }),
+);
 
-await whatsAppClient.start();
+if (config.waServiceAutoStart) {
+  await whatsAppClient.start("startup");
+} else {
+  logger.info(
+    { autoStart: false },
+    "WhatsApp service auto-start disabled; waiting for manual activation",
+  );
+}
 
 const app = createServer({ config, logger, whatsAppClient });
 const server = app.listen(config.port, () => {

@@ -27,6 +27,26 @@ import { phoneFromWhatsAppJid, phoneToWhatsAppJid } from "../utils/phone.js";
 type MessagesUpsert = BaileysEventMap["messages.upsert"];
 type MessagesUpdate = BaileysEventMap["messages.update"];
 type MessageReceiptUpdate = BaileysEventMap["message-receipt.update"];
+export type WaServiceState =
+  | "INACTIVE"
+  | "STARTING"
+  | "ACTIVE"
+  | "STOPPING"
+  | "ERROR";
+
+export type WaServiceStatus = {
+  active: boolean;
+  connected: boolean;
+  connection: "connecting" | "open" | "close";
+  hasQr: boolean;
+  state: WaServiceState;
+  lastChangedAt: string;
+};
+
+type StatusChangeHandler = (
+  status: WaServiceStatus,
+  reason: string,
+) => void | Promise<void>;
 
 function getDisconnectStatusCode(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) {
@@ -97,12 +117,19 @@ function getMessageTimestamp(message: proto.IWebMessageInfo): string {
   return new Date().toISOString();
 }
 
+const CLOSED_REPLY_TEXT =
+  "En este momento esta cerrado, pero con gusto le atendemos de Miercoles a Domingo de 11am a 5pm, recuerde que tenemos la mejor Mojarra de Villahermosa";
+
 export class WhatsAppClient {
   private socket: WASocket | null = null;
   private isStopping = false;
+  private desiredActive = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private latestQr: string | null = null;
-  private connectionStatus: "connecting" | "open" | "close" = "connecting";
+  private connectionStatus: "connecting" | "open" | "close" = "close";
+  private serviceState: WaServiceState = "INACTIVE";
+  private lastChangedAt = new Date().toISOString();
+  private statusChangeHandler: StatusChangeHandler | null = null;
   private phoneByLid = new Map<string, string>();
   private messageCache = new Map<string, proto.IMessage>();
 
@@ -111,8 +138,24 @@ export class WhatsAppClient {
     private readonly logger: Logger,
   ) {}
 
-  async start(): Promise<void> {
+  setStatusChangeHandler(handler: StatusChangeHandler): void {
+    this.statusChangeHandler = handler;
+  }
+
+  async start(reason = "manual_activate"): Promise<void> {
+    if (this.desiredActive && this.socket && this.connectionStatus !== "close") {
+      return;
+    }
+
     this.isStopping = false;
+    this.desiredActive = true;
+    this.connectionStatus = "connecting";
+    this.updateServiceState("STARTING", reason);
+
+    if (this.socket) {
+      this.socket.end(undefined);
+      this.socket = null;
+    }
 
     const { state, saveCreds } = await useMultiFileAuthState(
       this.config.whatsappAuthDir,
@@ -150,6 +193,7 @@ export class WhatsAppClient {
       if (update.connection === "open") {
         this.latestQr = null;
         this.connectionStatus = "open";
+        this.updateServiceState("ACTIVE", "connected");
         this.logger.info("WhatsApp socket connected");
       }
 
@@ -165,8 +209,13 @@ export class WhatsAppClient {
           "WhatsApp socket disconnected",
         );
 
-        if (!this.isStopping && !loggedOut) {
+        if (this.desiredActive && !this.isStopping && !loggedOut) {
+          this.updateServiceState("ERROR", "disconnected");
           this.scheduleReconnect();
+        } else if (loggedOut) {
+          this.updateServiceState("ERROR", "logged_out");
+        } else {
+          this.updateServiceState("INACTIVE", "stopped");
         }
       }
     });
@@ -188,8 +237,10 @@ export class WhatsAppClient {
     });
   }
 
-  async stop(): Promise<void> {
+  async stop(reason = "manual_deactivate"): Promise<void> {
     this.isStopping = true;
+    this.desiredActive = false;
+    this.updateServiceState("STOPPING", reason);
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -200,6 +251,10 @@ export class WhatsAppClient {
       this.socket.end(undefined);
       this.socket = null;
     }
+
+    this.latestQr = null;
+    this.connectionStatus = "close";
+    this.updateServiceState("INACTIVE", "stopped");
   }
 
   async sendSubscriptionMessage(params: {
@@ -227,6 +282,10 @@ export class WhatsAppClient {
   }): Promise<string> {
     if (!this.socket) {
       throw new Error("WhatsApp socket is not initialized");
+    }
+
+    if (!this.desiredActive) {
+      throw new Error("WhatsApp service is inactive");
     }
 
     if (this.connectionStatus !== "open") {
@@ -266,14 +325,20 @@ export class WhatsAppClient {
   }
 
   getStatus(): {
+    active: boolean;
     connected: boolean;
     connection: "connecting" | "open" | "close";
     hasQr: boolean;
+    state: WaServiceState;
+    lastChangedAt: string;
   } {
     return {
+      active: this.desiredActive,
       connected: this.connectionStatus === "open",
       connection: this.connectionStatus,
       hasQr: this.latestQr !== null,
+      state: this.serviceState,
+      lastChangedAt: this.lastChangedAt,
     };
   }
 
@@ -282,20 +347,51 @@ export class WhatsAppClient {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectTimer) {
+    if (this.reconnectTimer || !this.desiredActive) {
       return;
     }
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      void this.start().catch((error: unknown) => {
+      if (!this.desiredActive) {
+        return;
+      }
+
+      void this.start("reconnect").catch((error: unknown) => {
         this.logger.error(
           { err: error },
           "failed to reconnect WhatsApp socket",
         );
+        this.updateServiceState("ERROR", "reconnect_failed");
         this.scheduleReconnect();
       });
     }, 5000);
+  }
+
+  private updateServiceState(state: WaServiceState, reason: string): void {
+    const stateChanged = this.serviceState !== state;
+    this.serviceState = state;
+    this.lastChangedAt = new Date().toISOString();
+
+    if (!stateChanged && reason !== "startup") {
+      return;
+    }
+
+    const status = this.getStatus();
+    this.logger.info({ status, reason }, "WhatsApp service status changed");
+
+    if (!this.statusChangeHandler) {
+      return;
+    }
+
+    void Promise.resolve(this.statusChangeHandler(status, reason)).catch(
+      (error: unknown) => {
+        this.logger.error(
+          { err: error, status, reason },
+          "failed to notify WhatsApp service status change",
+        );
+      },
+    );
   }
 
   private async handleMessagesUpsert(event: MessagesUpsert): Promise<void> {
@@ -352,6 +448,10 @@ export class WhatsAppClient {
       return;
     }
 
+    if (!this.desiredActive) {
+      return;
+    }
+
     const phone =
       message.key.senderPn?.split("@")[0] ?? phoneFromWhatsAppJid(remoteJid);
     const text = getMessageText(message.message);
@@ -390,6 +490,22 @@ export class WhatsAppClient {
       messageId,
       receivedAt: timestamp,
     });
+
+    try {
+      const replyMessageId = await this.sendTextMessage({
+        phone,
+        text: CLOSED_REPLY_TEXT,
+      });
+      this.logger.info(
+        { phone, messageId, replyMessageId },
+        "sent closed-hours WhatsApp reply",
+      );
+    } catch (error) {
+      this.logger.error(
+        { err: error, phone, messageId },
+        "failed to send closed-hours WhatsApp reply",
+      );
+    }
 
     const existingRecord = await getRegistryRecord(
       this.config.registryStoreFile,

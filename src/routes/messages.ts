@@ -123,12 +123,10 @@ export function createMessagesRouter(params: {
       try {
         phone = normalizePhone(req.params.phone ?? "");
       } catch (error) {
-        res
-          .status(400)
-          .json({
-            ok: false,
-            error: error instanceof Error ? error.message : "Invalid phone",
-          });
+        res.status(400).json({
+          ok: false,
+          error: error instanceof Error ? error.message : "Invalid phone",
+        });
         return;
       }
 
@@ -319,12 +317,10 @@ export function createMessagesRouter(params: {
           { err: error },
           "failed to list recent inbound WhatsApp contacts with active promos",
         );
-        res
-          .status(502)
-          .json({
-            ok: false,
-            error: "Failed to list recent inbound contacts with active promos",
-          });
+        res.status(502).json({
+          ok: false,
+          error: "Failed to list recent inbound contacts with active promos",
+        });
       }
     },
   );
@@ -352,12 +348,10 @@ export function createMessagesRouter(params: {
     try {
       phone = normalizePhone(parsed.data.phone);
     } catch (error) {
-      res
-        .status(400)
-        .json({
-          ok: false,
-          error: error instanceof Error ? error.message : "Invalid phone",
-        });
+      res.status(400).json({
+        ok: false,
+        error: error instanceof Error ? error.message : "Invalid phone",
+      });
       return;
     }
 

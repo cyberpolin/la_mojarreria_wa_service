@@ -17,6 +17,9 @@ const envSchema = z.object({
   MAIN_BACKEND_WEBHOOK_SECRET: z
     .string()
     .min(1, "MAIN_BACKEND_WEBHOOK_SECRET is required"),
+  WA_SERVICE_AUTO_START: z
+    .enum(["true", "false", "1", "0"])
+    .default("false"),
   WHATSAPP_AUTH_DIR: z.string().min(1).default("./auth"),
   REGISTRY_STORE_FILE: z.string().min(1).default("./data/registrations.json"),
   INBOUND_CONTACTS_STORE_FILE: z
@@ -44,6 +47,8 @@ export const config = {
     .filter(Boolean),
   mainBackendUrl: env.MAIN_BACKEND_URL.replace(/\/+$/, ""),
   mainBackendWebhookSecret: env.MAIN_BACKEND_WEBHOOK_SECRET,
+  waServiceAutoStart:
+    env.WA_SERVICE_AUTO_START === "true" || env.WA_SERVICE_AUTO_START === "1",
   whatsappAuthDir: env.WHATSAPP_AUTH_DIR,
   registryStoreFile: env.REGISTRY_STORE_FILE,
   inboundContactsStoreFile: env.INBOUND_CONTACTS_STORE_FILE,

@@ -53,12 +53,10 @@ function parsePhoneParam(req: Request, res: Response): string | null {
   try {
     return normalizePhone(req.params.phone ?? "");
   } catch (error) {
-    res
-      .status(400)
-      .json({
-        ok: false,
-        error: error instanceof Error ? error.message : "Invalid phone",
-      });
+    res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Invalid phone",
+    });
     return null;
   }
 }
@@ -79,6 +77,52 @@ export function createV1Router(params: {
     }
 
     res.json({ ok: true, ...params.whatsAppClient.getStatus() });
+  });
+
+  router.get("/service/status", (req: Request, res: Response) => {
+    if (!ensureAuthorized(req, res, params.config)) {
+      return;
+    }
+
+    res.json({ ok: true, ...params.whatsAppClient.getStatus() });
+  });
+
+  router.post("/service/activate", async (req: Request, res: Response) => {
+    if (!ensureAuthorized(req, res, params.config)) {
+      return;
+    }
+
+    try {
+      await params.whatsAppClient.start("manual_activate");
+      res.json({ ok: true, ...params.whatsAppClient.getStatus() });
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to activate WhatsApp service",
+      });
+    }
+  });
+
+  router.post("/service/deactivate", async (req: Request, res: Response) => {
+    if (!ensureAuthorized(req, res, params.config)) {
+      return;
+    }
+
+    try {
+      await params.whatsAppClient.stop("manual_deactivate");
+      res.json({ ok: true, ...params.whatsAppClient.getStatus() });
+    } catch (error) {
+      res.status(500).json({
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to deactivate WhatsApp service",
+      });
+    }
   });
 
   router.get("/whatsapp/qr", async (req: Request, res: Response) => {
@@ -127,13 +171,11 @@ export function createV1Router(params: {
 
       res.json({ ok: true, to: phone, messageId });
     } catch (error) {
-      res
-        .status(502)
-        .json({
-          ok: false,
-          error:
-            error instanceof Error ? error.message : "Failed to send message",
-        });
+      res.status(502).json({
+        ok: false,
+        error:
+          error instanceof Error ? error.message : "Failed to send message",
+      });
     }
   });
 
@@ -144,13 +186,11 @@ export function createV1Router(params: {
 
     const parsed = limitQuerySchema.safeParse(req.query);
     if (!parsed.success) {
-      res
-        .status(400)
-        .json({
-          ok: false,
-          error: "Invalid query",
-          issues: parsed.error.flatten().fieldErrors,
-        });
+      res.status(400).json({
+        ok: false,
+        error: "Invalid query",
+        issues: parsed.error.flatten().fieldErrors,
+      });
       return;
     }
 
@@ -175,13 +215,11 @@ export function createV1Router(params: {
 
       const parsed = limitQuerySchema.safeParse(req.query);
       if (!parsed.success) {
-        res
-          .status(400)
-          .json({
-            ok: false,
-            error: "Invalid query",
-            issues: parsed.error.flatten().fieldErrors,
-          });
+        res.status(400).json({
+          ok: false,
+          error: "Invalid query",
+          issues: parsed.error.flatten().fieldErrors,
+        });
         return;
       }
 
