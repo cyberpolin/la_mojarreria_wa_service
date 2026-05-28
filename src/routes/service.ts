@@ -32,14 +32,19 @@ export function createServiceRouter(params: {
   });
 
   router.post("/activate", async (req: Request, res: Response) => {
+    console.log("Received request to activate WhatsApp service");
     if (!ensureAuthorized(req, res, params.config)) {
+      console.log("Unauthorized request to activate WhatsApp service");
       return;
     }
 
     try {
+      console.log("Starting WhatsApp service...");
       await params.whatsAppClient.start("manual_activate");
+      console.log("WhatsApp service started successfully");
       res.json({ ok: true, ...params.whatsAppClient.getStatus() });
     } catch (error) {
+      console.error("Error occurred while activating WhatsApp service:", error);
       res.status(500).json({
         ok: false,
         error:
