@@ -36,25 +36,54 @@ jobs:
 
       - name: Detect service directory
         run: |
+          set -eux
           if [ -f apps/wa-service/package.json ]; then
             echo "SERVICE_DIR=apps/wa-service" >> "$GITHUB_ENV"
           else
             echo "SERVICE_DIR=." >> "$GITHUB_ENV"
           fi
 
+      - name: Print runner build diagnostics
+        run: |
+          set -eux
+          echo "GitHub workspace: $GITHUB_WORKSPACE"
+          echo "Service directory: $SERVICE_DIR"
+          pwd
+          node --version
+          pnpm --version
+          pnpm config get store-dir
+          ls -la
+          ls -la "$SERVICE_DIR"
+          test -f pnpm-workspace.yaml && cat pnpm-workspace.yaml || true
+          cat "$SERVICE_DIR/package.json"
+          cat "$SERVICE_DIR/tsconfig.json"
+
       - name: Install dependencies
         run: |
+          set -eux
           if [ -f pnpm-lock.yaml ]; then
             pnpm install --frozen-lockfile
           else
             pnpm install --no-frozen-lockfile
           fi
 
+      - name: Print runner dependency diagnostics
+        run: |
+          set -eux
+          pnpm --dir "$SERVICE_DIR" exec tsc --version
+          pnpm --dir "$SERVICE_DIR" list --depth 0 || true
+          du -sh node_modules "$SERVICE_DIR/node_modules" 2>/dev/null || true
+
       - name: Typecheck
-        run: pnpm --dir "$SERVICE_DIR" typecheck
+        run: |
+          set -eux
+          pnpm --dir "$SERVICE_DIR" typecheck
 
       - name: Build
-        run: pnpm --dir "$SERVICE_DIR" build
+        run: |
+          set -eux
+          pnpm --dir "$SERVICE_DIR" build
+          find "$SERVICE_DIR/dist" -maxdepth 2 -type f -print
 
       - name: Write service env file
         env:
@@ -67,6 +96,7 @@ jobs:
 
       - name: Prepare release bundle
         run: |
+          set -eux
           mkdir -p /tmp/mojarreria-wa-service
           rsync -a \
             --exclude ".git" \
@@ -74,7 +104,12 @@ jobs:
             --exclude "apps/wa-service/auth" \
             --exclude "auth" \
             ./ /tmp/mojarreria-wa-service/
+          find /tmp/mojarreria-wa-service -maxdepth 3 -type f \
+            | sed 's#^/tmp/mojarreria-wa-service/##' \
+            | sort \
+            | head -200
           tar -czf mojarreria-wa-service.tar.gz -C /tmp mojarreria-wa-service
+          ls -lh mojarreria-wa-service.tar.gz
 
       - name: Upload release bundle
         uses: appleboy/scp-action@v0.1.7
@@ -105,16 +140,32 @@ jobs:
             export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
             [ ! -s "$NVM_DIR/nvm.sh" ] || . "$NVM_DIR/nvm.sh"
 
+            echo "Remote user: $(whoami)"
+            echo "Remote host: $(hostname)"
+            echo "Deploy path: configured"
+            echo "Initial directory: $(pwd)"
+            df -h .
+            free -h || true
+            ls -lh /tmp/mojarreria-wa-service.tar.gz
+
             mkdir -p "$DEPLOY_PATH"
             tar -xzf /tmp/mojarreria-wa-service.tar.gz -C "$DEPLOY_PATH" --strip-components=1
             cd "$DEPLOY_PATH"
+            echo "Extracted directory: $(pwd)"
+            ls -la
 
             SERVICE_DIR=.
             [ ! -f apps/wa-service/package.json ] || SERVICE_DIR=apps/wa-service
+            echo "Resolved service directory: $SERVICE_DIR"
+            ls -la "$SERVICE_DIR"
+            test -f pnpm-workspace.yaml && cat pnpm-workspace.yaml || true
+            cat "$SERVICE_DIR/package.json"
+            cat "$SERVICE_DIR/tsconfig.json"
 
             if command -v nvm >/dev/null 2>&1; then
               NODE_VERSION="$(find "$SERVICE_DIR" -maxdepth 1 -name .nvmrc -type f -exec cat {} \; -quit)"
               NODE_VERSION="${NODE_VERSION:-"--lts"}"
+              echo "Using Node version from nvm: $NODE_VERSION"
               nvm install "$NODE_VERSION"
               nvm use "$NODE_VERSION"
             fi
@@ -123,6 +174,8 @@ jobs:
 
             corepack enable
             corepack prepare pnpm@9.15.5 --activate
+            pnpm --version
+            pnpm config get store-dir
 
             if [ -f pnpm-lock.yaml ]; then
               pnpm install --prod=false --frozen-lockfile
@@ -130,7 +183,11 @@ jobs:
               pnpm install --prod=false --no-frozen-lockfile
             fi
 
+            pnpm --dir "$SERVICE_DIR" exec tsc --version
+            pnpm --dir "$SERVICE_DIR" list --depth 0 || true
+            du -sh node_modules "$SERVICE_DIR/node_modules" 2>/dev/null || true
             pnpm --dir "$SERVICE_DIR" build
+            find "$SERVICE_DIR/dist" -maxdepth 2 -type f -print
 
             mkdir -p "$SERVICE_DIR/auth"
             pnpm --dir "$SERVICE_DIR" exec pm2 startOrReload ecosystem.config.cjs --env production
