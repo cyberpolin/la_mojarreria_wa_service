@@ -81,6 +81,20 @@ Returns:
 { "ok": true }
 ```
 
+### `POST /service/status`
+
+Sets whether the WhatsApp service is active. When active and connected, inbound customer messages attempt the automatic closed-hours reply.
+
+```bash
+curl -X POST https://api.wa.lamojarreria.com/service/status \
+  -H "content-type: application/json" \
+  -H "x-api-key: SERVICE_API_KEY" \
+  -H "x-client-domain: lamojarreria.com" \
+  -d '{ "active": true }'
+```
+
+Use `{ "active": false }` to stop the WhatsApp service.
+
 ### `POST /messages/subscription`
 
 Headers:

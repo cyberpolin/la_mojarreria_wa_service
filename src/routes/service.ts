@@ -1,7 +1,13 @@
 import { Router, type Request, type Response } from "express";
+import type { Logger } from "pino";
+import { z } from "zod";
 import type { WhatsAppClient } from "../baileys/client.js";
 import type { AppConfig } from "../config.js";
 import { validateServiceRequest } from "../utils/requestAuth.js";
+
+const statusSchema = z.object({
+  active: z.boolean(),
+});
 
 function ensureAuthorized(
   req: Request,
@@ -19,6 +25,7 @@ function ensureAuthorized(
 
 export function createServiceRouter(params: {
   config: AppConfig;
+  logger: Logger;
   whatsAppClient: WhatsAppClient;
 }): Router {
   const router = Router();
@@ -32,25 +39,68 @@ export function createServiceRouter(params: {
   });
 
   router.post("/activate", async (req: Request, res: Response) => {
-    console.log("Received request to activate WhatsApp service");
+    params.logger.info("received request to activate WhatsApp service");
     if (!ensureAuthorized(req, res, params.config)) {
-      console.log("Unauthorized request to activate WhatsApp service");
+      params.logger.warn("unauthorized request to activate WhatsApp service");
       return;
     }
 
     try {
-      console.log("Starting WhatsApp service...");
+      params.logger.info("starting WhatsApp service");
       await params.whatsAppClient.start("manual_activate");
-      console.log("WhatsApp service started successfully");
+      params.logger.info("WhatsApp service started successfully");
       res.json({ ok: true, ...params.whatsAppClient.getStatus() });
     } catch (error) {
-      console.error("Error occurred while activating WhatsApp service:", error);
+      params.logger.error(
+        { err: error },
+        "error occurred while activating WhatsApp service",
+      );
       res.status(500).json({
         ok: false,
         error:
           error instanceof Error
             ? error.message
             : "Failed to activate WhatsApp service",
+      });
+    }
+  });
+
+  router.post("/status", async (req: Request, res: Response) => {
+    if (!ensureAuthorized(req, res, params.config)) {
+      return;
+    }
+
+    const parsed = statusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        ok: false,
+        error: "Invalid status payload",
+        details: parsed.error.flatten(),
+      });
+      return;
+    }
+
+    try {
+      if (parsed.data.active) {
+        params.logger.info("setting WhatsApp service status to active");
+        await params.whatsAppClient.start("set_status_active");
+      } else {
+        params.logger.info("setting WhatsApp service status to inactive");
+        await params.whatsAppClient.stop("set_status_inactive");
+      }
+
+      res.json({ ok: true, ...params.whatsAppClient.getStatus() });
+    } catch (error) {
+      params.logger.error(
+        { err: error, active: parsed.data.active },
+        "failed to set WhatsApp service status",
+      );
+      res.status(500).json({
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to set WhatsApp service status",
       });
     }
   });

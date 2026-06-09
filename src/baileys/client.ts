@@ -449,6 +449,10 @@ export class WhatsAppClient {
     }
 
     if (!this.desiredActive) {
+      this.logger.info(
+        { remoteJid, messageId: message.key.id },
+        "skipping inbound WhatsApp message because service is inactive",
+      );
       return;
     }
 
@@ -492,6 +496,10 @@ export class WhatsAppClient {
     });
 
     try {
+      this.logger.info(
+        { phone, messageId },
+        "attempting closed-hours WhatsApp autoresponse",
+      );
       const replyMessageId = await this.sendTextMessage({
         phone,
         text: CLOSED_REPLY_TEXT,

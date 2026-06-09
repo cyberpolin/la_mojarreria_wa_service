@@ -85,6 +85,7 @@ export function createServer(params: {
     "/service",
     createServiceRouter({
       config: params.config,
+      logger: params.logger,
       whatsAppClient: params.whatsAppClient,
     }),
   );
