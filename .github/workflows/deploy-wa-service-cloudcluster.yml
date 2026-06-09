@@ -132,7 +132,6 @@ jobs:
           timeout: 60s
           command_timeout: 2m
           request_pty: true
-          capture_stdout: true
           debug: true
           script: |
             set -eu
@@ -156,13 +155,13 @@ jobs:
           timeout: 60s
           command_timeout: 15m
           request_pty: true
-          capture_stdout: true
           debug: true
           script: |
             set -eu
             LOG_FILE="/tmp/mojarreria-wa-service-deploy.log"
             : > "$LOG_FILE"
-            exec > "$LOG_FILE" 2>&1
+
+            run_deploy() {
 
             : "${DEPLOY_PATH:?CLOUDCLUSTER_DEPLOY_PATH is required}"
 
@@ -222,13 +221,16 @@ jobs:
             pnpm --dir "$SERVICE_DIR" exec pm2 startOrReload ecosystem.config.cjs --env production
             pnpm --dir "$SERVICE_DIR" exec pm2 save
             pnpm --dir "$SERVICE_DIR" exec pm2 status
+            }
 
-      - name: Print captured deploy stdout
-        if: always()
-        run: |
-          cat <<'DEPLOY_STDOUT'
-          ${{ steps.deploy_ssh.outputs.stdout }}
-          DEPLOY_STDOUT
+            set +e
+            run_deploy > "$LOG_FILE" 2>&1
+            DEPLOY_STATUS="$?"
+            set -e
+
+            echo "Remote deploy log:"
+            cat "$LOG_FILE"
+            exit "$DEPLOY_STATUS"
 
       - name: Fetch remote deploy log
         if: always()
@@ -241,7 +243,6 @@ jobs:
           timeout: 60s
           command_timeout: 2m
           request_pty: true
-          capture_stdout: true
           debug: true
           script: |
             set -eu
