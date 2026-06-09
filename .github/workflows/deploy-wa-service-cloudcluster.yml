@@ -120,6 +120,7 @@ jobs:
           port: ${{ secrets.CLOUDCLUSTER_SSH_PORT || 22 }}
           source: mojarreria-wa-service.tar.gz
           target: /tmp
+          debug: true
 
       - name: Deploy on CloudCluster
         uses: appleboy/ssh-action@v1.2.0
@@ -132,6 +133,7 @@ jobs:
           port: ${{ secrets.CLOUDCLUSTER_SSH_PORT || 22 }}
           envs: DEPLOY_PATH
           script_stop: true
+          debug: true
           script: |
             set -eu
 

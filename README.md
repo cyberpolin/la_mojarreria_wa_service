@@ -4,6 +4,8 @@ Small standalone WhatsApp adapter service for onboarding and subscription replie
 
 This service is intentionally separate from the main La Mojarreria backend. It runs as a long-lived process on a VPS, sends WhatsApp subscription messages through Baileys, and forwards user replies to the main backend webhook. It does not decide whether a user is subscribed or verified.
 
+Production base URL: `https://api.wa.lamojarreria.com/`
+
 ## Stack
 
 - Node.js
