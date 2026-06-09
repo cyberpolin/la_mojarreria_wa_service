@@ -122,7 +122,28 @@ jobs:
           target: /tmp
           debug: true
 
+      - name: SSH smoke test
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.CLOUDCLUSTER_HOST }}
+          username: ${{ secrets.CLOUDCLUSTER_USER }}
+          key: ${{ secrets.CLOUDCLUSTER_SSH_KEY }}
+          port: ${{ secrets.CLOUDCLUSTER_SSH_PORT || 22 }}
+          timeout: 60s
+          command_timeout: 2m
+          request_pty: true
+          capture_stdout: true
+          debug: true
+          script: |
+            set -eu
+            echo "SSH smoke test started"
+            whoami
+            hostname
+            pwd
+            echo "SSH smoke test finished"
+
       - name: Deploy on CloudCluster
+        id: deploy_ssh
         uses: appleboy/ssh-action@v1.2.0
         env:
           DEPLOY_PATH: ${{ secrets.CLOUDCLUSTER_DEPLOY_PATH }}
@@ -132,10 +153,16 @@ jobs:
           key: ${{ secrets.CLOUDCLUSTER_SSH_KEY }}
           port: ${{ secrets.CLOUDCLUSTER_SSH_PORT || 22 }}
           envs: DEPLOY_PATH
-          script_stop: true
+          timeout: 60s
+          command_timeout: 15m
+          request_pty: true
+          capture_stdout: true
           debug: true
           script: |
             set -eu
+            LOG_FILE="/tmp/mojarreria-wa-service-deploy.log"
+            : > "$LOG_FILE"
+            exec > "$LOG_FILE" 2>&1
 
             : "${DEPLOY_PATH:?CLOUDCLUSTER_DEPLOY_PATH is required}"
 
@@ -195,3 +222,32 @@ jobs:
             pnpm --dir "$SERVICE_DIR" exec pm2 startOrReload ecosystem.config.cjs --env production
             pnpm --dir "$SERVICE_DIR" exec pm2 save
             pnpm --dir "$SERVICE_DIR" exec pm2 status
+
+      - name: Print captured deploy stdout
+        if: always()
+        run: |
+          cat <<'DEPLOY_STDOUT'
+          ${{ steps.deploy_ssh.outputs.stdout }}
+          DEPLOY_STDOUT
+
+      - name: Fetch remote deploy log
+        if: always()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.CLOUDCLUSTER_HOST }}
+          username: ${{ secrets.CLOUDCLUSTER_USER }}
+          key: ${{ secrets.CLOUDCLUSTER_SSH_KEY }}
+          port: ${{ secrets.CLOUDCLUSTER_SSH_PORT || 22 }}
+          timeout: 60s
+          command_timeout: 2m
+          request_pty: true
+          capture_stdout: true
+          debug: true
+          script: |
+            set -eu
+            echo "Remote deploy log:"
+            if [ -f /tmp/mojarreria-wa-service-deploy.log ]; then
+              cat /tmp/mojarreria-wa-service-deploy.log
+            else
+              echo "No remote deploy log file found"
+            fi
