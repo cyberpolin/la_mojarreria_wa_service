@@ -233,6 +233,45 @@ export function createV1Router(params: {
     },
   );
 
+  router.post(
+    "/conversations/:phone/messages",
+    async (req: Request, res: Response) => {
+      if (!ensureAuthorized(req, res, params.config)) {
+        return;
+      }
+
+      const phone = parsePhoneParam(req, res);
+      if (!phone) {
+        return;
+      }
+
+      const parsed = sendMessageSchema.omit({ to: true }).safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          ok: false,
+          error: "Invalid request body",
+          issues: parsed.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      try {
+        const messageId = await params.whatsAppClient.sendTextMessage({
+          phone,
+          text: parsed.data.text,
+        });
+
+        res.json({ ok: true, phone, messageId });
+      } catch (error) {
+        res.status(502).json({
+          ok: false,
+          error:
+            error instanceof Error ? error.message : "Failed to send message",
+        });
+      }
+    },
+  );
+
   router.get(
     "/conversations/:phone/last-message",
     async (req: Request, res: Response) => {

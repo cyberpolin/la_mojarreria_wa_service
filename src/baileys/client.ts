@@ -143,7 +143,11 @@ export class WhatsAppClient {
   }
 
   async start(reason = "manual_activate"): Promise<void> {
-    if (this.desiredActive && this.socket && this.connectionStatus !== "close") {
+    if (
+      this.desiredActive &&
+      this.socket &&
+      this.connectionStatus !== "close"
+    ) {
       return;
     }
 

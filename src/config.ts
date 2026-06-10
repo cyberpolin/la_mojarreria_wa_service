@@ -17,9 +17,7 @@ const envSchema = z.object({
   MAIN_BACKEND_WEBHOOK_SECRET: z
     .string()
     .min(1, "MAIN_BACKEND_WEBHOOK_SECRET is required"),
-  WA_SERVICE_AUTO_START: z
-    .enum(["true", "false", "1", "0"])
-    .default("false"),
+  WA_SERVICE_AUTO_START: z.enum(["true", "false", "1", "0"]).default("false"),
   WHATSAPP_AUTH_DIR: z.string().min(1).default("./auth"),
   REGISTRY_STORE_FILE: z.string().min(1).default("./data/registrations.json"),
   INBOUND_CONTACTS_STORE_FILE: z
